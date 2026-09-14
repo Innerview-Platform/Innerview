@@ -1,0 +1,125 @@
+services:
+  # ── Frontend (React + nginx reverse proxy) ──────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_LIVEKIT_URL: ${VITE_LIVEKIT_URL:-ws://localhost:7880}
+    container_name: innerview-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - innerview-network
+
+  # ── Backend (Spring Boot) ───────────────────────
+  backend:
+    build:
+      context: ./services/spring-boot
+      dockerfile: Dockerfile
+    container_name: innerview-backend
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    environment:
+      # Database
+      DB_URL: jdbc:mysql://mysql:3306/innerview?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USERNAME: ${DB_USERNAME:-innerview}
+      DB_PASSWORD: ${DB_PASSWORD:-innerview_pass}
+
+      # Override the hardcoded redis localhost in application.yml
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-for-dev-only-change-in-production}
+
+      # Frontend URL (used for CORS + OAuth2 redirects)
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+
+      # Google OAuth2 (optional — set in .env for real Google login)
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-dummy-client-id}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-dummy-client-secret}
+
+      # Mail (optional — leave blank if not using)
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped
+    networks:
+      - innerview-network
+
+  # ── MySQL Database ──────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: innerview-mysql
+    environment:
+      MYSQL_DATABASE: innerview
+      MYSQL_USER: ${DB_USERNAME:-innerview}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-innerview_pass}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_pass}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-root_pass}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - innerview-network
+
+  # ── Redis Cache ─────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: innerview-redis
+    command: redis-server --save 60 1 --loglevel warning
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - innerview-network
+
+  # ── LiveKit SFU (Video / Audio streaming) ────────
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: innerview-livekit
+    command: --dev --bind 0.0.0.0
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    restart: unless-stopped
+    networks:
+      - innerview-network
+
+volumes:
+  mysql-data:
+  redis-data:
+
+networks:
+  innerview-network:
+    driver: bridge
