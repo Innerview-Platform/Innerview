@@ -1,6 +1,7 @@
 package com.innerview.spring.entity;
 
 import com.innerview.spring.enums.Channel;
+import com.innerview.spring.enums.NotificationType;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -12,6 +13,7 @@ import lombok.Data;
 public class ScheduleNotification {
 
   @Builder.Default private String eventId = UUID.randomUUID().toString();
+  NotificationType type;
   Channel channel;
   Long interviewId;
   String recipientEmail;
