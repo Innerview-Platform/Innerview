@@ -1,0 +1,13 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "innerview-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "frontend", "dev"],
+      "port": 5174,
+      "autoPort": true,
+      "env": { "VITE_LIVEKIT_URL": "ws://localhost:7880" }
+    }
+  ]
+}
