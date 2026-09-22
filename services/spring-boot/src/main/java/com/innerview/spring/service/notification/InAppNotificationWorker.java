@@ -1,7 +1,5 @@
 package com.innerview.spring.service.notification;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innerview.spring.entity.InAppNotification;
 import com.innerview.spring.entity.OutboxRecord;
 import com.innerview.spring.entity.ScheduleNotification;
@@ -24,7 +22,6 @@ public class InAppNotificationWorker implements Runnable {
   private final OutboxRepository outboxRepository;
   private final InAppNotificationRepository inAppNotificationRepository;
   private final SseEmitterRegistry emitterRegistry;
-  private final ObjectMapper objectMapper;
 
   static final int ATTEMPTS_THRESHOLD = 3;
   static final long BACKOFF_1ST_MS = 30_000L;
@@ -73,13 +70,14 @@ public class InAppNotificationWorker implements Runnable {
     long now = System.currentTimeMillis();
 
     // 1. Persist the inbox content record BEFORE any delivery attempt
-    //    so the notification exists in the user's feed even if SSE never lands
-    String payloadJson;
-    try {
-      payloadJson = objectMapper.writeValueAsString(event.getPayload());
-    } catch (JsonProcessingException e) {
+    //    so the notification exists in the user's feed even if SSE never lands.
+    //    The content is pre-rendered JSON built by the Notification subclass — see
+    //    NotificationService.dispatch().
+    Object rawContent = event.getPayload() != null ? event.getPayload().get("content") : null;
+    if (!(rawContent instanceof String payloadJson)) {
       log.error(
-          "Failed to serialize payload for eventId={} — skipping delivery", event.getEventId(), e);
+          "Missing rendered 'content' in payload for eventId={} — skipping delivery",
+          event.getEventId());
       return;
     }
 

@@ -1,7 +1,15 @@
 package com.innerview.spring.service.impl;
 
+import com.innerview.spring.dto.Notification;
 import com.innerview.spring.entity.ScheduleNotification;
+import com.innerview.spring.enums.Channel;
+import com.innerview.spring.enums.NotificationType;
+import com.innerview.spring.interfaces.EmailSendable;
+import com.innerview.spring.interfaces.InAppSendable;
 import com.innerview.spring.service.NotificationPublisherService;
+import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,5 +77,66 @@ public class NotificationService implements NotificationPublisherService {
               event.getEventId());
     }
   }
-}
 
+  @Override
+  public void dispatch(Notification notification, NotificationType type) {
+    dispatch(notification, type, null, null, null, null, null, null);
+  }
+
+  @Override
+  public void dispatch(
+      Notification notification,
+      NotificationType type,
+      Long interviewId,
+      Instant date,
+      Instant endTime,
+      Integer durationMinutes,
+      String ownerUsername,
+      String ownerAccount) {
+
+    if (notification == null) {
+      log.warn("dispatch() called with null notification — ignoring");
+      return;
+    }
+
+    UUID recipientId = UUID.fromString(notification.getRecipientId());
+    String recipientEmail = notification.getReciepentEmail();
+
+    if (notification instanceof EmailSendable emailSendable) {
+      ScheduleNotification emailEvent =
+          ScheduleNotification.builder()
+              .eventId(notification.getNotificationId())
+              .type(type)
+              .channel(Channel.EMAIL)
+              .recipientId(recipientId)
+              .recipientEmail(recipientEmail)
+              .interviewId(interviewId)
+              .date(date)
+              .endTime(endTime)
+              .durationMinutes(durationMinutes)
+              .OwnerUsername(ownerUsername)
+              .OwnerAccount(ownerAccount)
+              .payload(
+                  Map.of(
+                      "subject", emailSendable.getEmailSubject(),
+                      "toEmail", recipientEmail,
+                      "html", emailSendable.toEmailContent()))
+              .build();
+      publishEvent(emailEvent);
+    }
+
+    if (notification instanceof InAppSendable inAppSendable) {
+      ScheduleNotification inAppEvent =
+          ScheduleNotification.builder()
+              .eventId(notification.getNotificationId())
+              .type(type)
+              .channel(Channel.IN_APP)
+              .recipientId(recipientId)
+              .recipientEmail(recipientEmail)
+              .interviewId(interviewId)
+              .payload(Map.of("content", inAppSendable.toInAppContent()))
+              .build();
+      publishEvent(inAppEvent);
+    }
+  }
+}

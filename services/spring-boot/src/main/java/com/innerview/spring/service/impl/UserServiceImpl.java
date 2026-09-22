@@ -6,12 +6,15 @@ import com.innerview.spring.dto.LoginResponse;
 import com.innerview.spring.dto.RegisterRequest;
 import com.innerview.spring.dto.RegisterResponse;
 import com.innerview.spring.dto.ResetPasswordRequest;
+import com.innerview.spring.dto.WelcomeNotification;
 import com.innerview.spring.entity.User;
+import com.innerview.spring.enums.NotificationType;
 import com.innerview.spring.exception.DuplicateEmailException;
 import com.innerview.spring.exception.InvalidEmailException;
 import com.innerview.spring.exception.PasswordAndConfirmationMisMatchException;
 import com.innerview.spring.repository.UserRepository;
 import com.innerview.spring.service.EmailExitanceService;
+import com.innerview.spring.service.NotificationPublisherService;
 import com.innerview.spring.service.RefreshTokenService;
 import com.innerview.spring.service.UserService;
 import java.nio.charset.StandardCharsets;
@@ -23,10 +26,13 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
@@ -35,6 +41,10 @@ public class UserServiceImpl implements UserService {
   private final RefreshTokenService tokenService;
   private final EmailService emailService;
   private final EmailExitanceService emailExitanceService;
+  private final NotificationPublisherService notificationPublisherService;
+
+  @Value("${frontend.url}")
+  private String frontendUrl;
 
   @Override
   public RegisterResponse createUser(RegisterRequest registerDTO) {
@@ -62,12 +72,27 @@ public class UserServiceImpl implements UserService {
             .build();
 
     User savedUser = userRepository.save(user);
+
+    sendWelcomeNotification(savedUser);
+
     RegisterResponse registerResponse =
         RegisterResponse.builder()
             .userId(savedUser.getId())
             .message("User registered successfully")
             .build();
     return registerResponse;
+  }
+
+  private void sendWelcomeNotification(User user) {
+    try {
+      WelcomeNotification notification =
+          new WelcomeNotification(
+              user.getId().toString(), user.getEmail(), "InnerView", frontendUrl + "/login");
+      notificationPublisherService.dispatch(notification, NotificationType.WELCOME);
+    } catch (Exception e) {
+      // Never let a notification failure block registration
+      log.error("Failed to send welcome notification for userId={}", user.getId(), e);
+    }
   }
 
   @Override

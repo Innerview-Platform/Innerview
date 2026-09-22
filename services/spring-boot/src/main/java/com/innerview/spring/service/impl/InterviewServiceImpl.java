@@ -3,13 +3,13 @@ package com.innerview.spring.service.impl;
 import com.innerview.spring.core.util.RoomUtil;
 import com.innerview.spring.dto.InstantInterviewRequest;
 import com.innerview.spring.dto.InterviewResponse;
+import com.innerview.spring.dto.InterviewScheduledNotification;
 import com.innerview.spring.dto.InterviewSummaryDto;
 import com.innerview.spring.dto.ScheduledInterviewRequest;
 import com.innerview.spring.entity.Interview;
 import com.innerview.spring.entity.Problem;
-import com.innerview.spring.entity.ScheduleNotification;
-import com.innerview.spring.enums.Channel;
 import com.innerview.spring.enums.InterviewStatus;
+import com.innerview.spring.enums.NotificationType;
 import com.innerview.spring.enums.RoomSize;
 import com.innerview.spring.mapper.InterviewMapper;
 import com.innerview.spring.repository.InterviewRepository;
@@ -20,7 +20,6 @@ import com.innerview.spring.service.UserProfileService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -134,45 +133,38 @@ public class InterviewServiceImpl implements InterviewService {
 
     // sending notification
 
-    sendScheduleNotification(savedInterview, userId);
+    sendScheduleNotification(savedInterview, userId, request.getRoomSize());
 
     return response;
   }
 
-  private void sendScheduleNotification(Interview interview, UUID userID) {
-    // sending notification
+  private void sendScheduleNotification(Interview interview, UUID userId, RoomSize roomSize) {
     var ownerProfile = userProfileService.getUserProfile(interview.getOwnerId());
-    var userEmail = userProfileService.getUserProfile(userID).getUser().getEmail();
-    var scheduleNotificationEmail =
-        ScheduleNotification.builder()
-            .interviewId(interview.getId())
-            .date(interview.getStartTime())
-            .channel(Channel.EMAIL)
-            .recipientEmail(userEmail)
-            .recipientId(userID)
-            .OwnerAccount(ownerProfile.getUser().getEmail())
-            .OwnerUsername(ownerProfile.getUser().getName())
-            .endTime(interview.getEndTime())
-            .durationMinutes(interview.getDurationMinutes())
-            .payload(Map.of("schedulling", "the meeting scheduleed"))
-            .build();
+    var userEmail = userProfileService.getUserProfile(userId).getUser().getEmail();
+    String ownerName = ownerProfile.getUser().getName();
+    String sessionUrl = frontendUrl + "/room/join/" + interview.getRoomId();
 
-    var scheduleNotificationInApp =
-        ScheduleNotification.builder()
-            .interviewId(interview.getId())
-            .date(interview.getStartTime())
-            .channel(Channel.IN_APP)
-            .recipientEmail(userEmail)
-            .recipientId(userID)
-            .OwnerAccount(ownerProfile.getUser().getEmail())
-            .OwnerUsername(ownerProfile.getUser().getName())
-            .endTime(interview.getEndTime())
-            .durationMinutes(interview.getDurationMinutes())
-            .payload(Map.of("schedulling", "the meeting scheduleed"))
-            .build();
+    InterviewScheduledNotification notification =
+        new InterviewScheduledNotification(
+            userId.toString(),
+            userEmail,
+            ownerName,
+            interview.getType(),
+            roomSize,
+            interview.getStartTime(),
+            interview.getDurationMinutes(),
+            sessionUrl);
+
     // send it nonblocking
-    notificationPublisherService.publishEvent(scheduleNotificationEmail);
-    notificationPublisherService.publishEvent(scheduleNotificationInApp);
+    notificationPublisherService.dispatch(
+        notification,
+        NotificationType.INTERVIEW_SCHEDULED,
+        interview.getId(),
+        interview.getStartTime(),
+        interview.getEndTime(),
+        interview.getDurationMinutes(),
+        ownerName,
+        ownerProfile.getUser().getEmail());
   }
 
   private List<Problem> resolveProblems(List<UUID> problemIds) {

@@ -1,6 +1,8 @@
 package com.innerview.spring.repository;
 
 import com.innerview.spring.entity.Interview;
+import com.innerview.spring.enums.InterviewStatus;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -11,6 +13,9 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface InterviewRepository extends JpaRepository<Interview, Long> {
+
+    /** Scheduled interviews whose start time falls between from and to (inclusive) — used to fire reminders. */
+    List<Interview> findByStatusAndStartTimeBetween(InterviewStatus status, Instant from, Instant to);
 
     @Query(value = "SELECT i.* FROM interviews i "
             + "JOIN interview_participants p ON i.id = p.interview_id "

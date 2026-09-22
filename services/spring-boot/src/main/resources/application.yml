@@ -67,6 +67,11 @@ aws:
 notification:
   dynamo:
     inapp-table: interview-in-app-notifications
+  workers:
+    # Sized to what downstream systems (Gmail SMTP, DynamoDB) can sustain concurrently —
+    # NOT to CPU core count. These workers are I/O-bound and idle-cheap.
+    in-app: 8
+    email: 5
 # Server configuration
 server:
   port: 8080
