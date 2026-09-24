@@ -3,16 +3,20 @@ package com.innerview.spring.service.impl;
 import com.innerview.spring.core.util.RoomUtil;
 import com.innerview.spring.dto.InstantInterviewRequest;
 import com.innerview.spring.dto.InterviewResponse;
+import com.innerview.spring.dto.InterviewScheduledNotification;
 import com.innerview.spring.dto.InterviewSummaryDto;
 import com.innerview.spring.dto.ScheduledInterviewRequest;
 import com.innerview.spring.entity.Interview;
 import com.innerview.spring.entity.Problem;
 import com.innerview.spring.enums.InterviewStatus;
+import com.innerview.spring.enums.NotificationType;
 import com.innerview.spring.enums.RoomSize;
 import com.innerview.spring.mapper.InterviewMapper;
 import com.innerview.spring.repository.InterviewRepository;
 import com.innerview.spring.repository.ProblemRepository;
 import com.innerview.spring.service.InterviewService;
+import com.innerview.spring.service.NotificationPublisherService;
+import com.innerview.spring.service.UserProfileService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -32,6 +36,8 @@ import org.springframework.stereotype.Service;
 public class InterviewServiceImpl implements InterviewService {
   private final InterviewRepository interviewRepository;
   private final InterviewMapper interviewMapper;
+  private final UserProfileService userProfileService;
+  private final NotificationPublisherService notificationPublisherService;
   private final ProblemRepository problemRepository;
   private final SimpMessagingTemplate messagingTemplate;
   private final RedisTemplate redisTemplate;
@@ -125,7 +131,40 @@ public class InterviewServiceImpl implements InterviewService {
     // Assuming frontendUrl is a class-level variable like @Value("${frontend.url}")
     response.setRoomLink(frontendUrl + "/room/join/" + savedInterview.getRoomId());
 
+    // sending notification
+
+    sendScheduleNotification(savedInterview, userId, request.getRoomSize());
+
     return response;
+  }
+
+  private void sendScheduleNotification(Interview interview, UUID userId, RoomSize roomSize) {
+    var ownerProfile = userProfileService.getUserProfile(interview.getOwnerId());
+    var userEmail = userProfileService.getUserProfile(userId).getUser().getEmail();
+    String ownerName = ownerProfile.getUser().getName();
+    String sessionUrl = frontendUrl + "/room/join/" + interview.getRoomId();
+
+    InterviewScheduledNotification notification =
+        new InterviewScheduledNotification(
+            userId.toString(),
+            userEmail,
+            ownerName,
+            interview.getType(),
+            roomSize,
+            interview.getStartTime(),
+            interview.getDurationMinutes(),
+            sessionUrl);
+
+    // send it nonblocking
+    notificationPublisherService.dispatch(
+        notification,
+        NotificationType.INTERVIEW_SCHEDULED,
+        interview.getId(),
+        interview.getStartTime(),
+        interview.getEndTime(),
+        interview.getDurationMinutes(),
+        ownerName,
+        ownerProfile.getUser().getEmail());
   }
 
   private List<Problem> resolveProblems(List<UUID> problemIds) {
