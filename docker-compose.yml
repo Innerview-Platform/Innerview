@@ -31,7 +31,7 @@ services:
       - "${BACKEND_PORT:-8080}:8080"
     environment:
       # Database
-      DB_URL: jdbc:mysql://mysql:3306/innerview?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_URL: jdbc:postgresql://postgres:5432/innerview
       DB_USERNAME: ${DB_USERNAME:-innerview}
       DB_PASSWORD: ${DB_PASSWORD:-innerview_pass}
 
@@ -68,7 +68,7 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -86,21 +86,20 @@ services:
     networks:
       - innerview-network
 
-  # ── MySQL Database ──────────────────────────────
-  mysql:
-    image: mysql:8.0
-    container_name: innerview-mysql
+  # ── PostgreSQL Database ─────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: innerview-postgres
     environment:
-      MYSQL_DATABASE: innerview
-      MYSQL_USER: ${DB_USERNAME:-innerview}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-innerview_pass}
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_pass}
+      POSTGRES_DB: innerview
+      POSTGRES_USER: ${DB_USERNAME:-innerview}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-innerview_pass}
     ports:
-      - "${DB_PORT:-3306}:3306"
+      - "${DB_PORT:-5432}:5432"
     volumes:
-      - mysql-data:/var/lib/mysql
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-root_pass}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-innerview} -d innerview"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -215,7 +214,7 @@ services:
       - innerview-network
 
 volumes:
-  mysql-data:
+  postgres-data:
   redis-data:
   piston-packages:
   canvas-data:

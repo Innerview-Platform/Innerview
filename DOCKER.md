@@ -30,7 +30,7 @@ Browser (http://localhost:3000)
   ├── /canvas/*     ──→ nginx ──→ tldraw sync server (shared whiteboard)
   ├── /collab/*     ──→ nginx ──→ Hocuspocus server (shared code editor + notes)
   │                                   │
-  │                                   ├── MySQL (innerview-mysql:3306)
+  │                                   ├── PostgreSQL (innerview-postgres:5432)
   │                                   └── Redis (innerview-redis:6379)
   │
   └── Video / Audio ──→ LiveKit SFU (innerview-livekit:7880)
@@ -47,7 +47,7 @@ Browser (http://localhost:3000)
 | Editor     | `innerview-editor`   | 1234         | 1234               | http://localhost:1234/health    |
 | Piston     | `innerview-piston`   | 2000         | 2000               | http://localhost:2000/api/v2/runtimes |
 | DynamoDB   | `innerview-dynamodb` | 8000         | 8000               | http://localhost:8000           |
-| MySQL      | `innerview-mysql`    | 3306         | 3306               | `mysql://localhost:3306`        |
+| PostgreSQL | `innerview-postgres` | 5432         | 5432               | `postgresql://localhost:5432`   |
 | Redis      | `innerview-redis`    | 6379         | 6379               | `redis://localhost:6379`        |
 
 ## Common Commands
@@ -91,10 +91,9 @@ All configuration is managed through the `.env` file at the project root.
 |-----------------------|----------------------------------|------------------------------------------------|
 | `FRONTEND_PORT`       | `3000`                           | Host port for the frontend                     |
 | `FRONTEND_URL`        | `http://localhost:3000`          | CORS origin + OAuth2 redirect base             |
-| `DB_USERNAME`         | `innerview`                      | MySQL username                                 |
-| `DB_PASSWORD`         | `innerview_pass`                 | MySQL password                                 |
-| `DB_ROOT_PASSWORD`    | `root_pass`                      | MySQL root password                            |
-| `DB_PORT`             | `3306`                           | Host port for MySQL                            |
+| `DB_USERNAME`         | `innerview`                      | PostgreSQL username                            |
+| `DB_PASSWORD`         | `innerview_pass`                 | PostgreSQL password                            |
+| `DB_PORT`             | `5432`                           | Host port for PostgreSQL                       |
 | `REDIS_PORT`          | `6379`                           | Host port for Redis                            |
 | `JWT_SECRET`          | *(dev placeholder)*              | JWT signing secret                             |
 | `GOOGLE_CLIENT_ID`    | *(empty)*                        | Google OAuth2 client ID                        |
@@ -108,7 +107,7 @@ All configuration is managed through the `.env` file at the project root.
 
 ```
 Host:     localhost
-Port:     3306
+Port:     5432
 Database: innerview
 Username: innerview
 Password: innerview_pass
@@ -117,7 +116,7 @@ Password: innerview_pass
 ### Reset the database
 
 ```bash
-# Stop everything and delete the MySQL volume
+# Stop everything and delete the PostgreSQL volume
 docker compose down -v
 
 # Start fresh
@@ -207,7 +206,7 @@ before building the frontend image. It isn't needed on localhost.
 The code editor, the problem statement and the interviewers' private notes are Yjs documents on a
 self-hosted [Hocuspocus](https://tiptap.dev/docs/hocuspocus) server (`innerview-editor`, source in
 `services/nodejs/collaboration-editor`): incremental sync (no document size limit), live cursors,
-SQLite persistence in the `editor-data` volume, snapshots mirrored to MySQL, and a replay timeline
+SQLite persistence in the `editor-data` volume, final snapshots saved to PostgreSQL, and a replay timeline
 for the interview summary.
 
 ## Room access
@@ -232,12 +231,12 @@ To enable Google login:
 
 ## Troubleshooting
 
-### Backend won't start — "Connection refused" to MySQL
+### Backend won't start — "Connection refused" to PostgreSQL
 
-MySQL may still be initializing. The backend has `depends_on` with a health check, but if the first attempt fails:
+PostgreSQL may still be initializing. The backend has `depends_on` with a health check, but if the first attempt fails:
 
 ```bash
-docker compose logs mysql    # Check MySQL is healthy
+docker compose logs postgres # Check PostgreSQL is healthy
 docker compose restart backend
 ```
 

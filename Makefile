@@ -10,10 +10,10 @@
 #   make stop      stop the supporting containers
 #   make piston-langs  install the code runner's languages into Piston (once per machine)
 #
-# The backend uses the local MySQL database configured in .env.
+# The backend uses the local PostgreSQL database configured in .env.
 
 JAVA_HOME ?= /usr/lib/jvm/java-21-openjdk-amd64
-INFRA := piston redis dynamodb livekit
+INFRA := postgres piston redis dynamodb livekit
 
 # Must match .env (FRONTEND_PORT, CANVAS_PORT, BACKEND_PORT).
 FRONTEND_PORT ?= 3000

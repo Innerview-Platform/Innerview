@@ -40,7 +40,7 @@ The AI Copilot is a **silent interviewer assistant**. It does not communicate di
 
 IMPORTANT:
 
-Design the UI according to the provided InnerView MySQL database.
+Design the UI according to the provided InnerView PostgreSQL database.
 
 Do NOT invent unrelated entities or fields.
 

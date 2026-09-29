@@ -10,7 +10,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.Data;
 
-/** A live interview room (in memory; the interview row in MySQL is the durable record). */
+/** A live interview room (in memory; the interview row in PostgreSQL is the durable record). */
 @Data
 public class ActiveRoom {
   /** Canonical room code (see RoomUtil). */

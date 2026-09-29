@@ -7,7 +7,7 @@
 [![React](https://img.shields.io/badge/React-19.0.0-blue.svg?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg?logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-v4-38bdf8.svg?logo=tailwindcss)](https://tailwindcss.com/)
-[![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1.svg?logo=mysql&logoColor=white)](https://www.mysql.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1.svg?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7.2-DC382D.svg?logo=redis&logoColor=white)](https://redis.io/)
 [![Docker Compose](https://img.shields.io/badge/Docker-Compose%20Ready-2496ED.svg?logo=docker)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -20,7 +20,7 @@
 
 The platform bridges this preparation gap by pairing candidates in dedicated, synchronized interview environments. InnerView dynamically adapts its workspace based on the interview format—delivering an in-browser collaborative code editor powered by CRDTs (Conflict-free Replicated Data Types) for algorithmic coding, an interactive canvas blueprint for system design evaluations, or a conversational setup for behavioral and HR rounds.
 
-InnerView is built with an enterprise-ready architecture featuring a **Java 21 / Spring Boot 3.5** backend, a **React 19 / TypeScript / Vite** Single Page Application, **MySQL 8.0** for relational persistence, **Redis 7.2** for sub-millisecond ephemeral room caching, and **WebSocket / STOMP** alongside **LiveKit SFU** for ultra-low latency audio/video and state synchronization. The entire multi-service topology is containerized and runnable via Docker Compose out of the box.
+InnerView is built with an enterprise-ready architecture featuring a **Java 21 / Spring Boot 3.5** backend, a **React 19 / TypeScript / Vite** Single Page Application, **PostgreSQL 16** for relational persistence, **Redis 7.2** for sub-millisecond ephemeral room caching, and **WebSocket / STOMP** alongside **LiveKit SFU** for ultra-low latency audio/video and state synchronization. The entire multi-service topology is containerized and runnable via Docker Compose out of the box.
 
 ```mermaid
 graph TD
@@ -30,7 +30,7 @@ graph TD
     subgraph Docker Network [innerview-network]
         Nginx -->|Static Assets| SPA[React 19 SPA]
         Nginx -->|/api/* & /ws-signal/*| Backend[Spring Boot 3.5 API :8080]
-        Backend <-->|JPA / Hibernate| MySQL[(MySQL 8.0 :3306)]
+        Backend <-->|JPA / Hibernate| PostgreSQL[(PostgreSQL 16 :5432)]
         Backend <-->|Debounced CRDT Cache| Redis[(Redis 7.2 :6379)]
     end
 
@@ -44,7 +44,7 @@ graph TD
 
 ### 1. Authentication & Security
 * **Stateless JWT Authentication:** Access tokens signed via HMAC-SHA (`jjwt` 0.11.5) with a 15-minute expiration period.
-* **Persistent Refresh Token Rotation:** 7-day cryptographic refresh tokens stored in MySQL, delivered via secure `HttpOnly`, `SameSite=Strict` cookies to mitigate XSS exposure.
+* **Persistent Refresh Token Rotation:** 7-day cryptographic refresh tokens stored in PostgreSQL, delivered via secure `HttpOnly`, `SameSite=Strict` cookies to mitigate XSS exposure.
 * **Google OAuth2 Social Login:** Full OpenID Connect flow integrated with Spring Security's `oauth2Login` and custom `OAuth2SuccessHandler` to create or link Google profiles.
 * **Self-Service Password Reset:** Time-limited password reset tokens with transactional dispatch of responsive HTML emails rendered via Thymeleaf templates.
 * **Stateless Client Session Synchronization:** Frontend Redux Toolkit store with `localStorage` fallback, expiration tracking, and multi-tab state synchronization.
@@ -118,7 +118,7 @@ flowchart TB
     end
 
     subgraph DataTier [Persistence & Caching Tier]
-        MySQL[(MySQL 8.0 Database)]
+        PostgreSQL[(PostgreSQL 16 Database)]
         Redis[(Redis 7.2 In-Memory Cache)]
     end
 
@@ -141,7 +141,7 @@ flowchart TB
     RoomCtrl --> LiveKitSvc --> LiveKitServer
     SigCtrl --> RoomSvc & CodeSvc
     CodeSvc --> Debounce --> Redis
-    ProfileCtrl & InterviewCtrl & RoomSvc --> MySQL
+    ProfileCtrl & InterviewCtrl & RoomSvc --> PostgreSQL
 ```
 
 ### Technology Breakdown
@@ -162,7 +162,7 @@ flowchart TB
 | **Backend Framework** | Spring Boot | 3.5.7 | Robust enterprise REST and WebSocket microservice |
 | **Language (Backend)** | Java (OpenJDK) | 21 (LTS) | Modern Java virtual machine runtime |
 | **Security** | Spring Security | 6.5.6 | Stateless JWT authorization, password hashing, OAuth2 |
-| **Relational Database**| MySQL | 8.0 | Primary ACID storage for users, profiles, and interviews |
+| **Relational Database**| PostgreSQL | 16 | Primary ACID storage for users, profiles, and interviews |
 | **ORM / Data Access** | Spring Data JPA / Hibernate | 6.6 | Object-relational mapping and repository abstraction |
 | **Caching** | Spring Data Redis (Lettuce) | 7.2 | Room code state persistence and debounce buffering |
 | **Video SFU Backend** | LiveKit Server SDK | 0.8.2 | LiveKit room access token generation |
@@ -415,7 +415,7 @@ sequenceDiagram
 
 ```
 Innerview/
-├── docker-compose.yml             # Orchestration: frontend, backend, mysql, redis
+├── docker-compose.yml             # Orchestration: frontend, backend, postgres, redis
 ├── .env.example                   # Baseline environment variable template
 ├── DOCKER.md                      # Detailed Docker operations runbook
 ├── LICENSE                        # Project MIT License
@@ -485,10 +485,10 @@ Innerview/
 | `FRONTEND_PORT` | `3000` | No | Host port mapped to the Nginx frontend reverse proxy |
 | `BACKEND_PORT` | `8080` | No | Host port mapped directly to the Spring Boot container |
 | `FRONTEND_URL` | `http://localhost:3000` | Yes | Browser-facing URL used for backend CORS and OAuth redirects |
-| `DB_PORT` | `3306` | No | Host port mapped to MySQL |
+| `DB_URL` | `jdbc:postgresql://localhost:5432/innerview` | Yes | JDBC URL for PostgreSQL |
+| `DB_PORT` | `5432` | No | Host port mapped to PostgreSQL |
 | `DB_USERNAME` | `innerview` | Yes | Database user for the Spring application |
 | `DB_PASSWORD` | `innerview_pass` | Yes | Database user password |
-| `DB_ROOT_PASSWORD`| `root_pass` | Yes | MySQL administrative root password |
 | `REDIS_PORT` | `6379` | No | Host port mapped to Redis |
 | `JWT_SECRET` | *(64-char dev key)* | Yes | Cryptographic secret for signing HMAC-SHA JWT access tokens |
 | `GOOGLE_CLIENT_ID` | `dummy-client-id` | Optional | Google Cloud Console OAuth 2.0 Client ID |
@@ -510,7 +510,7 @@ Innerview/
 
 ### Option A: Quick Start with Docker Compose (Recommended)
 
-Docker Compose automatically configures, links, and runs the entire stack—Frontend, Backend, LiveKit SFU, MySQL, and Redis.
+Docker Compose automatically configures, links, and runs the entire stack—Frontend, Backend, LiveKit SFU, PostgreSQL, and Redis.
 
 #### 1. Clone the repository
 ```bash
@@ -550,16 +550,14 @@ If you prefer developing outside of containers, follow these steps to run each s
 #### Prerequisites
 * **Node.js**: `v20+` or `v22+` with `pnpm` installed (`corepack enable pnpm`)
 * **Java SDK**: `OpenJDK 21` or `Eclipse Temurin 21`
-* **MySQL**: `8.0` running locally on port `3306`
+* **PostgreSQL**: `16` running locally on port `5432`
 * **Redis**: `7.0+` running locally on port `6379`
 
-#### 1. Setup MySQL Database
-Connect to your local MySQL instance and create the database and user:
+#### 1. Setup PostgreSQL Database
+Connect to your local PostgreSQL instance and create the database and user:
 ```sql
-CREATE DATABASE innerview CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'innerview'@'localhost' IDENTIFIED BY 'innerview_pass';
-GRANT ALL PRIVILEGES ON innerview.* TO 'innerview'@'localhost';
-FLUSH PRIVILEGES;
+CREATE USER innerview WITH PASSWORD 'innerview_pass';
+CREATE DATABASE innerview OWNER innerview;
 ```
 
 #### 2. Start the Spring Boot Backend
@@ -568,7 +566,7 @@ Navigate to the backend directory and run:
 cd services/spring-boot
 
 # Set required environment variables for local execution
-export DB_URL="jdbc:mysql://localhost:3306/innerview?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+export DB_URL="jdbc:postgresql://localhost:5432/innerview"
 export DB_USERNAME="innerview"
 export DB_PASSWORD="innerview_pass"
 export JWT_SECRET="super-secret-jwt-key-for-dev-only-change-in-production"

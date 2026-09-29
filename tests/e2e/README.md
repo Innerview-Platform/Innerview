@@ -18,9 +18,10 @@ exists, so create them directly in the local database:
 PW='choose-a-password-1A!'
 HASH=$(htpasswd -bnBC 10 "" "$PW" | tr -d ':\n' | sed 's/^\$2y/$2a/')
 for u in alice bob carol; do
-  mysql -u "$DB_USERNAME" -p"$DB_PASSWORD" -h 127.0.0.1 innerview -e "
-    INSERT IGNORE INTO users (id, auth_provider, created_at, email, forgot_password_count, name, password_hash, updated_at)
-    VALUES (UUID_TO_BIN(UUID()), 'local', NOW(6), '$u.runner@innerview.test', 0, CONCAT(UPPER(LEFT('$u',1)), SUBSTRING('$u',2), ' Tester'), '$HASH', NOW(6));"
+  PGPASSWORD="$DB_PASSWORD" psql -h 127.0.0.1 -p "${DB_PORT:-5432}" -U "$DB_USERNAME" -d innerview -v ON_ERROR_STOP=1 -c "
+    INSERT INTO users (id, auth_provider, created_at, email, forgot_password_count, name, password_hash, updated_at)
+    VALUES (gen_random_uuid(), 'local', CURRENT_TIMESTAMP, '$u.runner@innerview.test', 0, CONCAT(UPPER(LEFT('$u',1)), SUBSTRING('$u',2), ' Tester'), '$HASH', CURRENT_TIMESTAMP)
+    ON CONFLICT (email) DO NOTHING;"
 done
 ```
 

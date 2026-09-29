@@ -48,3 +48,5 @@ application.properties
 .idea/*.xml
 node_modules/
 
+.neon
+.env.local

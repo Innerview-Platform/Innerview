@@ -1,19 +1,20 @@
 version: '3.8'
 
 services:
-  # 1. MySQL Database
-  mysql:
-    image: mysql:8.0
-    container_name: innerview-mysql
+  # 1. PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: innerview-postgres
     environment:
-      MYSQL_ROOT_PASSWORD: Atoof
-      MYSQL_DATABASE: innerview_db
+      POSTGRES_USER: innerview
+      POSTGRES_PASSWORD: innerview_pass
+      POSTGRES_DB: innerview_db
     ports:
-      - "3307:3306"
+      - "5432:5432"
     volumes:
-      - mysql-data:/var/lib/mysql
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pAtoof"]
+      test: ["CMD-SHELL", "pg_isready -U innerview -d innerview_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -50,6 +51,6 @@ services:
      start_period: 15s
 
 volumes:
-  mysql-data:
+  postgres-data:
   redis-data:
   dynamodb-data:
