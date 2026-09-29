@@ -2,6 +2,8 @@
 
 Run the entire InnerView platform locally with a single command.
 
+> Deploying to a server (HTTPS on a public IP)? See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
 ## Quick Start
 
 ```bash
