@@ -8,7 +8,6 @@ import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.Key;
-import java.security.MessageDigest;
 import java.util.Date;
 import java.util.HexFormat;
 import java.util.Map;
@@ -89,14 +88,9 @@ public class RoomTicketService {
     }
   }
 
-  /** Shared secret for service-to-service calls (Hocuspocus → backend and backend → Node services). */
+  /** Shared secret for backend-to-collaboration-service calls. */
   public String internalToken() {
     return internalToken;
-  }
-
-  public boolean isInternalToken(String presented) {
-    return presented != null
-        && MessageDigest.isEqual(presented.getBytes(StandardCharsets.UTF_8), internalToken.getBytes(StandardCharsets.UTF_8));
   }
 
   private static byte[] hmac(String secret, String label) {

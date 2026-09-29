@@ -5,8 +5,8 @@ documents. Each room has `{room}/code`, `{room}/notes` and `{room}/private` (int
 
 - **Auth** — clients send a *room ticket* (issued by the backend on join, signed with a key derived
   from `JWT_SECRET`). Observers, review tickets and ended interviews are read-only.
-- **Persistence** — SQLite in `$EDITOR_DATA_DIR` (default `./data`); every store is mirrored to the
-  backend (`POST /api/internal/documents`) so the interview row always has the latest text.
+- **Persistence** — SQLite in `$EDITOR_DATA_DIR` (default `./data`); when an interview ends, the
+  backend asks this service to flush the current document text onto the interview row.
 - **Replay** — every update of the code document is kept; `GET /replay/:room?token=…` returns them.
 - **Internal API** (`X-Internal-Token`): `POST /internal/rooms/:room/{flush|revoke|close}`.
 
@@ -20,4 +20,3 @@ npm run dev   # reads ../../../.env, listens on EDITOR_PORT (1234)
 | `JWT_SECRET` | — (required) | Same as the backend |
 | `EDITOR_PORT` | `1234` | |
 | `EDITOR_DATA_DIR` | `./data` | |
-| `BACKEND_INTERNAL_URL` | `http://localhost:8080` | Where snapshots are sent |

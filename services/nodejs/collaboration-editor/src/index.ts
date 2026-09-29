@@ -7,8 +7,8 @@
  *   private  interviewers' private notes (host and interviewers only)
  *
  * Clients authenticate with a room ticket from the backend. Documents are persisted to SQLite,
- * mirrored to the backend (POST /api/internal/documents) and the code document's updates are kept
- * as a replay timeline.
+ * and the code document's updates are kept as a replay timeline. The backend pulls final document
+ * contents when an interview ends.
  *
  *   WS   /                          Hocuspocus (document name + ticket in the auth message)
  *   GET  /replay/:room?token=…      code history for the interview summary (room/review ticket)
@@ -36,21 +36,6 @@ function parseName(documentName: string): { room: string; kind: Kind } | null {
   const [room, kind, ...rest] = documentName.split('/')
   if (rest.length || !room || !/^[a-z0-9]{1,32}$/.test(room) || !KINDS.includes(kind as Kind)) return null
   return { room, kind: kind as Kind }
-}
-
-/** Mirrors a document's text to the backend so it's on the interview row (survives data loss here). */
-async function pushSnapshot(room: string, kind: Kind, text: string) {
-  try {
-    const response = await fetch(`${config.backendUrl}/api/internal/documents`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Internal-Token': config.internalToken },
-      body: JSON.stringify({ room, document: kind, text }),
-      signal: AbortSignal.timeout(5_000),
-    })
-    if (!response.ok) console.warn(`[editor] snapshot ${room}/${kind} rejected: ${response.status}`)
-  } catch (error) {
-    console.warn(`[editor] snapshot ${room}/${kind} failed: ${(error as Error).message}`)
-  }
 }
 
 function textOf(kind: Kind, state: Uint8Array | null): string {
@@ -88,11 +73,6 @@ const server = new Server<Context>({
 
   async onChange({ documentName, update }) {
     if (documentName.endsWith('/code')) store.appendUpdate(documentName, update)
-  },
-
-  async afterStoreDocument({ documentName, document }) {
-    const target = parseName(documentName)
-    if (target) await pushSnapshot(target.room, target.kind, document.getText(target.kind).toString())
   },
 
   async onRequest({ request, response, instance }) {

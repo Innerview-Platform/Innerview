@@ -25,10 +25,7 @@
     "editor": {
       "root": "services/nodejs/collaboration-editor",
       "runtime": "container",
-      "entrypoint": "Dockerfile.vercel",
-      "bindings": [
-        { "type": "service", "service": "backend", "format": "url", "env": "BACKEND_INTERNAL_URL" }
-      ]
+      "entrypoint": "Dockerfile.vercel"
     }
   },
   "rewrites": [
