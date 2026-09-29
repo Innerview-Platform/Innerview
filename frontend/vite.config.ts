@@ -10,7 +10,9 @@ import path from 'node:path'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const proxyTarget = env.VITE_DEV_PROXY_TARGET || 'http://localhost:8080'
-  const port = Number(env.PORT || 3000)
+  const canvasTarget = env.VITE_DEV_CANVAS_TARGET || 'http://localhost:5858'
+  const editorTarget = env.VITE_DEV_EDITOR_TARGET || 'http://localhost:1234'
+  const port = Number(env.PORT || env.FRONTEND_PORT || 3000)
 
   // Requests are same-origin from the browser's point of view. Dropping the Origin header keeps
   // Spring Security's CORS filter (which only allows `frontend.url`) from rejecting requests and
@@ -29,9 +31,15 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port,
+      // Google OAuth redirects back to FRONTEND_URL, so never drift to another port.
+      strictPort: true,
       proxy: {
         '/api': { target: proxyTarget, changeOrigin: true, ...stripOrigin },
         '/ws-signal': { target: proxyTarget, ws: true, changeOrigin: true, ...stripOrigin },
+        // tldraw sync server (services/nodejs/collaboration-canvas) for the shared whiteboard.
+        '/canvas': { target: canvasTarget, ws: true, changeOrigin: true, rewrite: (p) => p.replace(/^\/canvas/, '') },
+        // Hocuspocus server (services/nodejs/collaboration-editor) for the shared code editor and notes.
+        '/collab': { target: editorTarget, ws: true, changeOrigin: true, rewrite: (p) => p.replace(/^\/collab/, '') },
       },
     },
     preview: { port },

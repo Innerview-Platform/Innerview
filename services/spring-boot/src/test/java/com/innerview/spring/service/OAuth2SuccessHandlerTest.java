@@ -155,23 +155,15 @@ class OAuth2SuccessHandlerTest {
 	}
 
 	private void assertCookiesAndRedirect() {
-		// 1. Verify Redirect URL
-		assertEquals("/api/auth/dashboard", response.getRedirectedUrl());
+		// 1. Back to the SPA, which exchanges the refresh cookie for an access token.
+		assertEquals("/api/auth/?signin=google", response.getRedirectedUrl());
 
-		// 2. Verify Cookies
-		Cookie[] cookies = response.getCookies();
-		assertNotNull(cookies);
-		assertEquals(2, cookies.length);
-
-		Cookie accessCookie = getCookieByName(cookies, "access_token");
-		assertNotNull(accessCookie);
-		assertEquals(mockAccessToken, accessCookie.getValue());
-		assertTrue(accessCookie.isHttpOnly());
-
-		Cookie refreshCookie = getCookieByName(cookies, "refresh_token");
-		assertNotNull(refreshCookie);
-		assertEquals(mockRefreshTokenString, refreshCookie.getValue());
-		assertTrue(refreshCookie.isHttpOnly());
+		// 2. Only the httpOnly refresh cookie is set (the SPA can't read an access-token cookie anyway).
+		String setCookie = response.getHeader("Set-Cookie");
+		assertNotNull(setCookie);
+		assertTrue(setCookie.startsWith("refresh_token=" + mockRefreshTokenString));
+		assertTrue(setCookie.contains("HttpOnly"));
+		assertTrue(setCookie.contains("Path=/api/auth"));
 	}
 
 	private Cookie getCookieByName(Cookie[] cookies, String name) {

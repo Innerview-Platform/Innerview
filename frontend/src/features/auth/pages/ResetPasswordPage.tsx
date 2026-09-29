@@ -51,7 +51,7 @@ export default function ResetPasswordPage() {
           <CheckCircle2 className="h-5 w-5" />
         </div>
         <AuthHeading title="Password updated" description={resetPassword.data.message} />
-        <Link to={isAuthenticated ? paths.dashboard : paths.login} className={buttonClasses({ size: 'lg', className: 'w-full' })}>
+        <Link to={isAuthenticated ? paths.home : paths.login} className={buttonClasses({ size: 'lg', className: 'w-full' })}>
           {isAuthenticated ? 'Go to dashboard' : 'Sign in'}
         </Link>
       </div>

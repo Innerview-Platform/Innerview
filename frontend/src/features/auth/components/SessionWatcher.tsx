@@ -9,14 +9,17 @@ import {
   sessionSynced,
 } from '@/features/auth/slices/authSlice'
 import { loadSession, SESSION_STORAGE_KEY } from '@/features/auth/utils/session'
+import { refreshSession } from '@/lib/axios'
 
-const WARNING_LEAD_MS = 2 * 60_000
+/** Refresh this long before the access token expires. */
+const REFRESH_LEAD_MS = 60_000
 // setTimeout delays above 2^31-1 ms overflow and fire immediately.
 const MAX_TIMEOUT_MS = 2_147_483_647
 
 /**
- * Keeps the client session consistent with the backend's short-lived access tokens:
- * warns before expiry, ends the session at expiry, and syncs sign-in/out across tabs.
+ * Keeps the session alive: silently refreshes the short-lived access token a minute before it
+ * expires (using the httpOnly refresh cookie), ends the session only if refreshing fails, and syncs
+ * sign-in/out across tabs.
  */
 export function SessionWatcher() {
   const dispatch = useAppDispatch()
@@ -25,22 +28,17 @@ export function SessionWatcher() {
 
   useEffect(() => {
     if (!expiresAt) return
-    const remaining = expiresAt - Date.now()
-    if (remaining <= 0) {
-      dispatch(sessionExpired())
-      return
-    }
-    const timers: ReturnType<typeof setTimeout>[] = []
-    if (remaining > WARNING_LEAD_MS) {
-      timers.push(
-        setTimeout(
-          () => toast.warning('Your session expires in 2 minutes', { description: 'Save your work — you will need to sign in again.' }),
-          Math.min(remaining - WARNING_LEAD_MS, MAX_TIMEOUT_MS),
-        ),
-      )
-    }
-    timers.push(setTimeout(() => dispatch(sessionExpired()), Math.min(remaining, MAX_TIMEOUT_MS)))
-    return () => timers.forEach(clearTimeout)
+    const timer = setTimeout(
+      async () => {
+        if (await refreshSession()) return
+        // Refresh failed (signed out elsewhere, refresh token expired): end at expiry.
+        const remaining = expiresAt - Date.now()
+        if (remaining <= 0) dispatch(sessionExpired())
+        else setTimeout(() => dispatch(sessionExpired()), Math.min(remaining, MAX_TIMEOUT_MS))
+      },
+      Math.max(0, Math.min(expiresAt - Date.now() - REFRESH_LEAD_MS, MAX_TIMEOUT_MS)),
+    )
+    return () => clearTimeout(timer)
   }, [expiresAt, dispatch])
 
   useEffect(() => {

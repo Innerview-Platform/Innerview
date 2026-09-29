@@ -6,12 +6,17 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_LIVEKIT_URL: ${VITE_LIVEKIT_URL:-ws://localhost:7880}
+        VITE_TLDRAW_LICENSE_KEY: ${VITE_TLDRAW_LICENSE_KEY:-}
     container_name: innerview-frontend
     ports:
       - "${FRONTEND_PORT:-3000}:80"
     depends_on:
       backend:
         condition: service_healthy
+      canvas:
+        condition: service_started
+      editor:
+        condition: service_started
     restart: unless-stopped
     networks:
       - innerview-network
@@ -43,6 +48,21 @@ services:
       # Google OAuth2 (optional — set in .env for real Google login)
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-dummy-client-id}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-dummy-client-secret}
+      GOOGLE_API_CLIENT_ID: ${GOOGLE_API_CLIENT_ID:-dummy-client-id}
+      GOOGLE_API_CLIENT_SECRET: ${GOOGLE_API_CLIENT_SECRET:-dummy-client-secret}
+
+      # Piston code execution
+      PISTON_URL: http://piston:2000
+
+      # DynamoDB Local (in-app notifications)
+      DYNAMODB_ENDPOINT: http://dynamodb:8000
+
+      # Collaboration services (internal URLs) and LiveKit
+      EDITOR_URL: http://editor:1234
+      CANVAS_URL: http://canvas:5858
+      LIVEKIT_URL: http://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-secret}
 
       # Mail (optional — leave blank if not using)
       MAIL_USERNAME: ${MAIL_USERNAME:-}
@@ -52,6 +72,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      piston:
+        condition: service_started
+      dynamodb:
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
       interval: 30s
@@ -103,6 +127,80 @@ services:
     networks:
       - innerview-network
 
+  # ── DynamoDB Local (in-app notifications) ────────
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    container_name: innerview-dynamodb
+    command: "-jar DynamoDBLocal.jar -sharedDb -inMemory"
+    ports:
+      - "${DYNAMODB_PORT:-8000}:8000"
+    restart: unless-stopped
+    networks:
+      - innerview-network
+
+  # ── Shared whiteboard (self-hosted tldraw sync server) ──
+  # services/nodejs/collaboration-canvas — the frontend's nginx proxies /canvas/* here.
+  canvas:
+    build:
+      context: ./services/nodejs/collaboration-canvas
+    container_name: innerview-canvas
+    ports:
+      - "${CANVAS_PORT:-5858}:5858"
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-for-dev-only-change-in-production}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+    volumes:
+      - canvas-data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5858/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - innerview-network
+
+  # ── Shared code editor + notes (self-hosted Hocuspocus / Yjs) ──
+  # services/nodejs/collaboration-editor — the frontend's nginx proxies /collab/* here.
+  editor:
+    build:
+      context: ./services/nodejs/collaboration-editor
+    container_name: innerview-editor
+    ports:
+      - "${EDITOR_PORT:-1234}:1234"
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-for-dev-only-change-in-production}
+      BACKEND_INTERNAL_URL: http://backend:8080
+    volumes:
+      - editor-data:/data
+    restart: unless-stopped
+    networks:
+      - innerview-network
+
+  # ── Piston (sandboxed code execution) ────────────
+  # https://github.com/engineer-man/piston — runs code for the shared editor's Run button
+  # (interactive, via ws://piston:2000/api/v2/connect) and for submission judging.
+  # Runtimes are installed once into the piston-packages volume; see DOCKER.md.
+  piston:
+    image: ghcr.io/engineer-man/piston
+    container_name: innerview-piston
+    privileged: true
+    ports:
+      - "${PISTON_PORT:-2000}:2000"
+    environment:
+      # Interactive runs wait on user input, so allow up to 5 minutes of wall time per run.
+      # CPU time stays low, which still stops busy loops quickly.
+      PISTON_RUN_TIMEOUT: 300000
+      PISTON_RUN_CPU_TIME: 10000
+      PISTON_OUTPUT_MAX_SIZE: 65536
+    volumes:
+      - piston-packages:/piston/packages
+    tmpfs:
+      - /tmp:exec
+    restart: unless-stopped
+    networks:
+      - innerview-network
+
   # ── LiveKit SFU (Video / Audio streaming) ────────
   livekit:
     image: livekit/livekit-server:latest
@@ -119,6 +217,9 @@ services:
 volumes:
   mysql-data:
   redis-data:
+  piston-packages:
+  canvas-data:
+  editor-data:
 
 networks:
   innerview-network:

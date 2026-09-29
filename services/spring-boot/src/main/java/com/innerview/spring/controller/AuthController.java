@@ -1,5 +1,6 @@
 package com.innerview.spring.controller;
 
+import java.util.LinkedHashMap;
 import com.innerview.spring.exception.InvalidRefreshTokenException;
 import com.innerview.spring.exception.RefreshTokenExpiredException;
 import org.springframework.http.HttpHeaders;
@@ -49,44 +50,75 @@ public class AuthController {
 	public ResponseEntity<?> loginUser(@RequestBody @Valid LoginRequest loginRequest) {
 		try {
 			LoginResponse response = userService.login(loginRequest);
-
-			ResponseCookie refreshTokenCookie = ResponseCookie.from("refresh_token", response.getRefreshToken())
-					.httpOnly(true)
-					.secure(false)
-					.path("/api/auth")
-					.maxAge(7 * 24 * 60 * 60)
-					.sameSite("Strict")
-					.build();
-
 			return ResponseEntity.ok()
-					.header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
+					.header(HttpHeaders.SET_COOKIE, refreshCookie(response.getRefreshToken(), REFRESH_COOKIE_MAX_AGE).toString())
 					.header(HttpHeaders.AUTHORIZATION, "Bearer " + response.getAccessToken())
 					.body(response);
-
 		} catch (IllegalArgumentException ex) {
 			return ResponseEntity.status(401)
 					.body(new ErrorMessageResponse("Incorrect email or password"));
 		}
 	}
 
+	/**
+	 * Exchanges the refresh token for a new access token and rotates the refresh token.
+	 *
+	 * <p>Browsers send the httpOnly {@code refresh_token} cookie (JS can't read it); other clients may
+	 * send {@code {"refreshToken": "..."}} in the body. Responds with the user and the new access token
+	 * (also in the {@code Authorization} header), and sets the rotated cookie.
+	 */
 	@PostMapping("/refresh")
 	@Transactional
-	public ResponseEntity<RefreshTokenResponse> refreshAccessToken(@RequestBody @Valid RefreshTokenRequest request) {
-
-		if (request.getRefreshToken() == null || request.getRefreshToken().trim().isEmpty()) {
+	public ResponseEntity<?> refreshAccessToken(
+			@CookieValue(name = REFRESH_COOKIE, required = false) String cookieToken,
+			@RequestBody(required = false) RefreshTokenRequest request) {
+		boolean fromCookie = cookieToken != null && !cookieToken.isBlank();
+		String presented = fromCookie ? cookieToken : request != null ? request.getRefreshToken() : null;
+		if (presented == null || presented.isBlank()) {
 			throw new InvalidRefreshTokenException("Refresh token is missing");
 		}
-		RefreshToken token = tokenService.findByToken(request.getRefreshToken())
+
+		RefreshToken token = tokenService.findByToken(presented)
 				.orElseThrow(() -> new InvalidRefreshTokenException("Invalid refresh token"));
 		if (!tokenService.isValidRefreshToken(token)) {
 			throw new RefreshTokenExpiredException("Refresh token expired");
 		}
+
 		User user = token.getUser();
-		tokenService.revokeToken(request.getRefreshToken());
+		tokenService.revokeToken(presented);
 		String newAccessToken = jwtUtil.generateAccessToken(user.getId());
 		RefreshToken newRefreshToken = tokenService.createRefreshToken(user);
-		RefreshTokenResponse response = new RefreshTokenResponse(newAccessToken, newRefreshToken.getToken());
-		return ResponseEntity.ok(response);
+
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("id", user.getId());
+		body.put("email", user.getEmail());
+		body.put("name", user.getName());
+		body.put("accessToken", newAccessToken);
+		if (!fromCookie) {
+			// Clients that sent the token in the body (no cookie jar) get the rotated one back the same way.
+			body.put("access_token", newAccessToken);
+			body.put("refresh_token", newRefreshToken.getToken());
+		}
+		return ResponseEntity.ok()
+				.header(HttpHeaders.SET_COOKIE, refreshCookie(newRefreshToken.getToken(), REFRESH_COOKIE_MAX_AGE).toString())
+				// Clears the Path=/ cookie older Google sign-ins set, so only one refresh_token remains.
+				.header(HttpHeaders.SET_COOKIE, ResponseCookie.from(REFRESH_COOKIE, "").path("/").maxAge(0).build().toString())
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + newAccessToken)
+				.body(body);
+	}
+
+	static final String REFRESH_COOKIE = "refresh_token";
+	static final long REFRESH_COOKIE_MAX_AGE = 7L * 24 * 60 * 60;
+
+	/** The refresh token cookie: httpOnly, only sent to /api/auth, same-site only. */
+	static ResponseCookie refreshCookie(String value, long maxAgeSeconds) {
+		return ResponseCookie.from(REFRESH_COOKIE, value)
+				.httpOnly(true)
+				.secure(false)
+				.path("/api/auth")
+				.maxAge(maxAgeSeconds)
+				.sameSite("Lax")
+				.build();
 	}
 
 	@PostMapping("/logout")
@@ -109,13 +141,7 @@ public class AuthController {
 			tokenService.revokeToken(refreshToken);
 
 			// Create a "dead" cookie to force the browser to delete the old one
-			ResponseCookie deleteCookie = ResponseCookie.from("refresh_token", "")
-					.httpOnly(true)
-					.secure(false) // Remember to match your login cookie settings
-					.path("/api/auth")
-					.maxAge(0) // 0 seconds means "Delete this immediately"
-					.sameSite("Strict")
-					.build();
+			ResponseCookie deleteCookie = refreshCookie("", 0);
 
 			return ResponseEntity.ok()
 					.header(HttpHeaders.SET_COOKIE, deleteCookie.toString())
