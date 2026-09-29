@@ -20,8 +20,8 @@ public class SchemaPatches implements ApplicationRunner {
 
   @Override
   public void run(ApplicationArguments args) {
-    // Was ENUM('BOTH','INTERVIEWEE','INTERVIEWER'); OBSERVER was added to InterviewRole.
-    patch("ALTER TABLE user_interview MODIFY COLUMN role VARCHAR(20) NOT NULL");
+    // OBSERVER was added to InterviewRole; keep existing PostgreSQL columns wide enough for it.
+    patch("ALTER TABLE user_interview ALTER COLUMN role TYPE VARCHAR(20)");
   }
 
   private void patch(String sql) {
