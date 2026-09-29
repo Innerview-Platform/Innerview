@@ -7,7 +7,7 @@ function required(name: string): string {
 }
 
 export const config = {
-  port: Number(process.env.CANVAS_PORT ?? 5858),
+  port: Number(process.env.PORT ?? process.env.CANVAS_PORT ?? 5858),
   host: process.env.CANVAS_HOST ?? '0.0.0.0',
   /** Same secret the Spring backend signs access tokens with (HS256, raw UTF-8 bytes). */
   jwtSecret: required('JWT_SECRET'),

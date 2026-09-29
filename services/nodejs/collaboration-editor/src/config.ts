@@ -10,7 +10,7 @@ function required(name: string): string {
 const jwtSecret = required('JWT_SECRET')
 
 export const config = {
-  port: Number(process.env.EDITOR_PORT ?? 1234),
+  port: Number(process.env.PORT ?? process.env.EDITOR_PORT ?? 1234),
   host: process.env.EDITOR_HOST ?? '0.0.0.0',
   dataDir: resolve(process.env.EDITOR_DATA_DIR ?? './data'),
   /** Backend base URL for document snapshots (POST /api/internal/documents). */

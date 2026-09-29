@@ -1,0 +1,45 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "frontend": {
+      "root": "frontend",
+      "framework": "vite",
+      "rewrites": [
+        { "source": "/(.*)", "destination": "/index.html" }
+      ]
+    },
+    "backend": {
+      "root": "services/spring-boot",
+      "runtime": "container",
+      "entrypoint": "Dockerfile.vercel",
+      "bindings": [
+        { "type": "service", "service": "editor", "format": "url", "env": "EDITOR_URL" },
+        { "type": "service", "service": "canvas", "format": "url", "env": "CANVAS_URL" }
+      ]
+    },
+    "canvas": {
+      "root": "services/nodejs/collaboration-canvas",
+      "runtime": "container",
+      "entrypoint": "Dockerfile.vercel"
+    },
+    "editor": {
+      "root": "services/nodejs/collaboration-editor",
+      "runtime": "container",
+      "entrypoint": "Dockerfile.vercel",
+      "bindings": [
+        { "type": "service", "service": "backend", "format": "url", "env": "BACKEND_INTERNAL_URL" }
+      ]
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "backend" } },
+    { "source": "/ws-signal/(.*)", "destination": { "service": "backend" } },
+    { "source": "/oauth2/(.*)", "destination": { "service": "backend" } },
+    { "source": "/login/oauth2/(.*)", "destination": { "service": "backend" } },
+    { "source": "/canvas/connect/(.*)", "destination": { "service": "canvas" } },
+    { "source": "/canvas/uploads/(.*)", "destination": { "service": "canvas" } },
+    { "source": "/collab/replay/(.*)", "destination": { "service": "editor" } },
+    { "source": "/collab", "destination": { "service": "editor" } },
+    { "source": "/(.*)", "destination": { "service": "frontend" } }
+  ]
+}

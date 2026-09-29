@@ -136,7 +136,7 @@ async function handleHttp(request: IncomingMessage, response: ServerResponse, in
     return true
   }
 
-  const replay = url.pathname.match(/^\/replay\/([a-z0-9]{1,32})$/)
+  const replay = url.pathname.match(/^\/(?:collab\/)?replay\/([a-z0-9]{1,32})$/)
   if (replay && request.method === 'GET') {
     const ticket = await verifyTicket(url.searchParams.get('token'))
     if (!ticket || ticket.room !== replay[1]) {
