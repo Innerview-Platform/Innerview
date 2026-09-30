@@ -1,20 +1,17 @@
 # collaboration-canvas
 
-Self-hosted [tldraw](https://tldraw.dev) sync server behind the interview room's **Whiteboard** tab.
-Based on tldraw's [simple-server-example](https://github.com/tldraw/tldraw/tree/main/templates/simple-server-example).
+Self-hosted Excalidraw scene sync server behind the interview room's **Whiteboard** tab.
 
 | Endpoint | Purpose |
 |---|---|
-| `WS /connect/:roomId?sessionId=…&token=…` | Multiplayer sync for one interview room (`TLSocketRoom`) |
-| `PUT /uploads/:id` | Upload an image/video (needs `Authorization: Bearer <access token>`) |
-| `GET /uploads/:id` | Serve an uploaded asset |
+| `WS /connect/:roomId?token=…` | Live scene sync for one interview room (token is a room ticket) |
 | `GET /health` | Health check |
+| `POST /internal/rooms/:room/:action` | Backend room close and user revoke hooks |
 
-- **Auth** — sockets and uploads need a valid InnerView access token, verified with the backend's
-  `JWT_SECRET` (HS256). Rejected sockets close with tldraw's `NOT_AUTHENTICATED` reason.
-- **Storage** — one SQLite file per room in `$CANVAS_DATA_DIR/rooms`, uploads in `$CANVAS_DATA_DIR/assets`
-  (default `./data`). Drawings survive restarts and everyone leaving.
-- **Link previews** are not fetched (no `/unfurl`), so the server never requests arbitrary URLs.
+- **Auth** — sockets need a valid InnerView room ticket, verified with the backend's `JWT_SECRET` (HS256).
+- **Storage** — one SQLite file per room in `$CANVAS_DATA_DIR/rooms` (default `./data`). Drawings survive restarts and everyone leaving.
+- **Read-only** — review tickets and ended interviews can receive scenes but cannot submit changes.
+- **Retention** — ended boards are deleted after `CANVAS_RETENTION_DAYS` (default 180).
 
 ## Run
 
@@ -29,11 +26,5 @@ The frontend reaches it at `/canvas/*` on its own origin (Vite proxy in developm
 |---|---|---|
 | `JWT_SECRET` | — (required) | Same secret as the Spring backend |
 | `CANVAS_PORT` | `5858` | |
-| `CANVAS_DATA_DIR` | `./data` | Rooms and uploads |
+| `CANVAS_DATA_DIR` | `./data` | Room scenes |
 | `FRONTEND_URL` | `http://localhost:3000` | Allowed CORS origin(s), comma separated |
-| `CANVAS_MAX_UPLOAD_MB` | `10` | |
-
-## License
-
-tldraw runs without a key in development (localhost / non-HTTPS). Production HTTPS deployments need a
-[tldraw license key](https://tldraw.dev/pricing) set as `VITE_TLDRAW_LICENSE_KEY` when building the frontend.

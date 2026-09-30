@@ -29,7 +29,7 @@ Browser (http://localhost:3000)
   ├── /api/*        ──→ nginx ──→ Spring Boot (backend container)
   ├── /ws-signal/*  ──→ nginx ──→ Spring Boot (WebSocket)
   ├── /oauth2/*     ──→ nginx ──→ Spring Boot (Google OAuth2)
-  ├── /canvas/*     ──→ nginx ──→ tldraw sync server (shared whiteboard)
+  ├── /canvas/*     ──→ nginx ──→ Excalidraw sync server (shared whiteboard)
   ├── /collab/*     ──→ nginx ──→ Hocuspocus server (shared code editor + notes)
   │                                   │
   │                                   ├── MySQL (innerview-mysql:3306)
@@ -194,15 +194,12 @@ Limits (see `docker-compose.yml`): each interactive run may last up to 5 minutes
 (it usually waits on input) and 10 seconds of CPU time. Piston's WebSocket API cannot send EOF,
 so programs that read stdin until end-of-file keep waiting — press **Stop** to end them.
 
-## Shared Whiteboard (tldraw)
+## Shared Whiteboard (Excalidraw)
 
-The room's **Whiteboard** tab is a [tldraw](https://tldraw.dev) canvas synced through a self-hosted
-sync server (`innerview-canvas`, source in `services/nodejs/collaboration-canvas`). Drawings are stored
-per room in the `canvas-data` volume. The server accepts only valid InnerView access tokens (it shares
-`JWT_SECRET` with the backend).
-
-tldraw needs a license key for production HTTPS deployments; set `VITE_TLDRAW_LICENSE_KEY` in `.env`
-before building the frontend image. It isn't needed on localhost.
+The room's **Whiteboard** tab is an [Excalidraw](https://excalidraw.com) canvas synced through a self-hosted
+server (`innerview-canvas`, source in `services/nodejs/collaboration-canvas`). Drawings are stored
+per room in the `canvas-data` volume. The server accepts only valid InnerView room tickets (it shares
+`JWT_SECRET` with the backend). No license key is needed.
 
 ## Shared code editor and notes (Hocuspocus)
 

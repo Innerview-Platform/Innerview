@@ -21,10 +21,8 @@ COPY . .
 # VITE_API_BASE_URL is intentionally left empty so the SPA calls /api/...
 # on its own origin (nginx reverse-proxies to the backend).
 ARG VITE_LIVEKIT_URL="ws://localhost:7880"
-ARG VITE_TLDRAW_LICENSE_KEY=""
 ENV VITE_API_BASE_URL=""
 ENV VITE_LIVEKIT_URL=$VITE_LIVEKIT_URL
-ENV VITE_TLDRAW_LICENSE_KEY=$VITE_TLDRAW_LICENSE_KEY
 RUN pnpm run build
 
 # ──────────────────────────────────────────────

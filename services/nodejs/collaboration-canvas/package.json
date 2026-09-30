@@ -2,7 +2,7 @@
   "name": "innerview-collaboration-canvas",
   "private": true,
   "version": "0.1.0",
-  "description": "Self-hosted tldraw sync server for the interview room's shared whiteboard.",
+  "description": "Self-hosted Excalidraw scene sync server for the interview room's shared whiteboard.",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -15,8 +15,6 @@
   "dependencies": {
     "@fastify/cors": "11.3.0",
     "@fastify/websocket": "11.3.1",
-    "@tldraw/sync-core": "5.4.2",
-    "@tldraw/tlschema": "5.4.2",
     "better-sqlite3": "12.11.1",
     "fastify": "5.12.5",
     "jose": "6.2.12",

@@ -1,13 +1,8 @@
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { NodeSqliteWrapper, SQLiteSyncStorage, TLSocketRoom } from '@tldraw/sync-core'
-import type { TLRecord } from '@tldraw/tlschema'
 import Database from 'better-sqlite3'
+import WebSocket from 'ws'
 import { config } from './config.ts'
-
-export interface SessionMeta {
-  userId: string
-}
 
 const ROOMS_DIR = join(config.dataDir, 'rooms')
 mkdirSync(ROOMS_DIR, { recursive: true })
@@ -15,32 +10,129 @@ mkdirSync(ROOMS_DIR, { recursive: true })
 /** Interview room ids are short alphanumeric codes; anything else is rejected before touching disk. */
 export const ROOM_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
 
-// There must only ever be one TLSocketRoom per room id, or users won't see each other's changes.
-const rooms = new Map<string, TLSocketRoom<TLRecord, SessionMeta>>()
+export interface Scene {
+  elements: unknown[]
+  files: Record<string, unknown>
+}
 
-export function getOrCreateRoom(roomId: string): TLSocketRoom<TLRecord, SessionMeta> {
+interface Session {
+  socket: WebSocket
+  userId: string
+  readonly: boolean
+}
+
+function mergeScene(current: Scene, incoming: Scene): Scene {
+  const elements = new Map(current.elements.map((element) => [(element as { id?: string }).id, element]))
+  for (const element of incoming.elements) {
+    const id = (element as { id?: string }).id
+    if (!id) continue
+    const previous = elements.get(id) as { version?: number; versionNonce?: number } | undefined
+    const next = element as { version?: number; versionNonce?: number }
+    if (!previous || (next.version ?? 0) > (previous.version ?? 0) ||
+      ((next.version ?? 0) === (previous.version ?? 0) && (next.versionNonce ?? 0) > (previous.versionNonce ?? 0))) {
+      elements.set(id, element)
+    }
+  }
+  return { elements: [...elements.values()], files: { ...current.files, ...incoming.files } }
+}
+
+/** One persisted Excalidraw scene and its live room sockets. */
+export class CanvasRoom {
+  private readonly db: Database.Database
+  private readonly sessions = new Set<Session>()
+  private scene: Scene = { elements: [], files: {} }
+  private closed = false
+
+  constructor(readonly roomId: string, private readonly onEmpty: () => void) {
+    this.db = new Database(join(ROOMS_DIR, `${roomId}.db`))
+    this.db.pragma('journal_mode = WAL')
+    this.db.exec('CREATE TABLE IF NOT EXISTS excalidraw_scene (id INTEGER PRIMARY KEY CHECK (id = 1), data TEXT NOT NULL)')
+    const stored = this.db.prepare('SELECT data FROM excalidraw_scene WHERE id = 1').get() as { data: string } | undefined
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored.data) as Partial<Scene>
+        if (Array.isArray(parsed.elements) && parsed.files && typeof parsed.files === 'object') {
+          this.scene = { elements: parsed.elements, files: parsed.files as Record<string, unknown> }
+        }
+      } catch {
+        console.warn(`[canvas] ignored invalid stored scene for room ${roomId}`)
+      }
+    }
+  }
+
+  connect(session: Session) {
+    this.sessions.add(session)
+    this.send(session.socket, { type: 'scene', scene: this.scene })
+    session.socket.on('message', (raw, isBinary) => {
+      if (isBinary || session.readonly || isRoomClosed(this.roomId)) return
+      let message: { type?: unknown; scene?: Partial<Scene> }
+      try {
+        message = JSON.parse(raw.toString()) as typeof message
+      } catch {
+        return
+      }
+      if (message.type !== 'scene' || !Array.isArray(message.scene?.elements) || !message.scene.files || typeof message.scene.files !== 'object') return
+
+      this.scene = mergeScene(this.scene, {
+        elements: message.scene.elements,
+        files: message.scene.files as Record<string, unknown>,
+      })
+      this.db.prepare('INSERT INTO excalidraw_scene (id, data) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data')
+        .run(JSON.stringify(this.scene))
+      this.broadcast({ type: 'scene', scene: this.scene })
+    })
+    session.socket.on('close', () => {
+      this.sessions.delete(session)
+      if (this.sessions.size === 0 && !this.closed) this.onEmpty()
+    })
+  }
+
+  disconnectUser(userId: string): number {
+    let disconnected = 0
+    for (const session of this.sessions) {
+      if (session.userId !== userId) continue
+      session.socket.close(1008, 'FORBIDDEN')
+      disconnected++
+    }
+    return disconnected
+  }
+
+  close() {
+    if (this.closed) return
+    this.closed = true
+    for (const session of this.sessions) session.socket.close(1001, 'Room closed')
+    this.db.close()
+  }
+
+  get sessionCount() {
+    return this.sessions.size
+  }
+
+  private broadcast(message: unknown) {
+    const data = JSON.stringify(message)
+    for (const { socket } of this.sessions) {
+      if (socket.readyState === WebSocket.OPEN) socket.send(data)
+    }
+  }
+
+  private send(socket: WebSocket, message: unknown) {
+    if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message))
+  }
+}
+
+const rooms = new Map<string, CanvasRoom>()
+
+export function getOrCreateRoom(roomId: string): CanvasRoom {
   const existing = rooms.get(roomId)
-  if (existing && !existing.isClosed()) return existing
-
-  // The document is persisted to SQLite as it changes, so a room survives restarts and
-  // everyone leaving; the next participant to open the whiteboard gets the same drawing back.
-  const db = new Database(join(ROOMS_DIR, `${roomId}.db`))
-  db.pragma('journal_mode = WAL')
-  const storage = new SQLiteSyncStorage<TLRecord>({ sql: new NodeSqliteWrapper(db) })
-
-  const room = new TLSocketRoom<TLRecord, SessionMeta>({
-    storage,
-    onSessionRemoved(room, { numSessionsRemaining }) {
-      if (numSessionsRemaining > 0) return
-      console.log(`[canvas] room ${roomId} is empty, unloading`)
-      room.close()
-      db.close()
-      rooms.delete(roomId)
-    },
+  if (existing) return existing
+  let room: CanvasRoom
+  room = new CanvasRoom(roomId, () => {
+    console.log(`[canvas] room ${roomId} is empty, unloading`)
+    room.close()
+    rooms.delete(roomId)
   })
-
-  console.log(`[canvas] room ${roomId} loaded`)
   rooms.set(roomId, room)
+  console.log(`[canvas] room ${roomId} loaded`)
   return room
 }
 
@@ -50,8 +142,8 @@ const closedMarker = (roomId: string) => join(ROOMS_DIR, `${roomId}.closed`)
 export function closeRoom(roomId: string) {
   writeFileSync(closedMarker(roomId), new Date().toISOString())
   const room = rooms.get(roomId)
-  if (!room) return
-  for (const session of room.getSessions()) room.closeSession(session.sessionId)
+  if (room) room.close()
+  rooms.delete(roomId)
 }
 
 export function isRoomClosed(roomId: string) {
@@ -60,16 +152,7 @@ export function isRoomClosed(roomId: string) {
 
 /** Disconnects one user (removed from the interview, or their permissions changed). */
 export function revokeUser(roomId: string, userId: string): number {
-  const room = rooms.get(roomId)
-  if (!room) return 0
-  let closed = 0
-  for (const session of room.getSessions()) {
-    if (session.meta.userId === userId) {
-      room.closeSession(session.sessionId)
-      closed++
-    }
-  }
-  return closed
+  return rooms.get(roomId)?.disconnectUser(userId) ?? 0
 }
 
 /** Deletes whiteboards of interviews that ended more than `days` ago (never ones that are open). */
