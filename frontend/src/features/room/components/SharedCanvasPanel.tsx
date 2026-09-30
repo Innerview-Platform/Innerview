@@ -1,15 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { CaptureUpdateAction, Excalidraw } from '@excalidraw/excalidraw'
-import type { BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
-import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types'
+import { useState, type ReactNode } from 'react'
+import { Excalidraw } from '@excalidraw/excalidraw'
+import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
 import '@excalidraw/excalidraw/index.css'
 import { AlertTriangle } from 'lucide-react'
 import { Spinner } from '@/components/common/Spinner'
-import { getCanvasUrl } from '@/constants/config'
+import { useCanvasSync } from '@/features/room/hooks/useCanvasSync'
 import type { RoomRealtime } from '@/features/room/hooks/useRoomRealtime'
-
-type Scene = { elements: readonly ExcalidrawElement[]; files: BinaryFiles }
-type CanvasStatus = 'connecting' | 'live' | 'reconnecting' | 'error'
 
 function CanvasMessage({ children, tone = 'muted' }: { children: ReactNode; tone?: 'muted' | 'danger' }) {
   return (
@@ -34,90 +30,7 @@ interface SharedCanvasPanelProps {
 /** System-design whiteboard shared by everyone in the room, synced through the self-hosted Excalidraw server. */
 export function SharedCanvasPanel({ roomId, fetchTicket, header, className, readOnly = false }: SharedCanvasPanelProps) {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null)
-  const [status, setStatus] = useState<CanvasStatus>('connecting')
-  const socketRef = useRef<WebSocket | null>(null)
-  const applyingRemote = useRef(false)
-  const pendingScene = useRef<Scene | null>(null)
-  const sendTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const applyScene = useCallback((scene: Scene) => {
-    if (!api) {
-      pendingScene.current = scene
-      return
-    }
-    applyingRemote.current = true
-    api.updateScene({ elements: scene.elements, captureUpdate: CaptureUpdateAction.NEVER })
-    api.addFiles(Object.values(scene.files))
-    queueMicrotask(() => { applyingRemote.current = false })
-  }, [api])
-
-  useEffect(() => {
-    if (!api || !pendingScene.current) return
-    const scene = pendingScene.current
-    pendingScene.current = null
-    applyScene(scene)
-  }, [api, applyScene])
-
-  useEffect(() => {
-    let stopped = false
-    let retryTimer: ReturnType<typeof setTimeout> | undefined
-    let retryDelay = 500
-    let socket: WebSocket | null = null
-
-    const connect = async () => {
-      try {
-        const ticket = await fetchTicket()
-        if (stopped) return
-        const url = new URL(getCanvasUrl(`/connect/${encodeURIComponent(roomId)}`, { ws: true }))
-        url.searchParams.set('token', ticket)
-        socket = new WebSocket(url)
-        socketRef.current = socket
-        socket.onopen = () => setStatus(retryDelay > 500 ? 'reconnecting' : 'connecting')
-        socket.onmessage = (event) => {
-          let message: { type?: string; scene?: Scene }
-          try { message = JSON.parse(event.data as string) as typeof message } catch { return }
-          if (message.type !== 'scene' || !message.scene) return
-          applyScene(message.scene)
-          setStatus('live')
-          retryDelay = 500
-        }
-        socket.onerror = () => socket?.close()
-        socket.onclose = () => {
-          if (socketRef.current === socket) socketRef.current = null
-          if (stopped) return
-          setStatus('reconnecting')
-          retryTimer = setTimeout(connect, retryDelay)
-          retryDelay = Math.min(retryDelay * 2, 10_000)
-        }
-      } catch {
-        if (!stopped) {
-          setStatus('error')
-          retryTimer = setTimeout(connect, retryDelay)
-          retryDelay = Math.min(retryDelay * 2, 10_000)
-        }
-      }
-    }
-
-    void connect()
-    return () => {
-      stopped = true
-      if (retryTimer) clearTimeout(retryTimer)
-      if (socketRef.current === socket) socketRef.current = null
-      socket?.close()
-      if (sendTimer.current) clearTimeout(sendTimer.current)
-    }
-  }, [roomId, fetchTicket, applyScene])
-
-  const onChange = useCallback((elements: readonly ExcalidrawElement[], _appState: unknown, files: BinaryFiles) => {
-    if (readOnly || applyingRemote.current) return
-    if (sendTimer.current) clearTimeout(sendTimer.current)
-    sendTimer.current = setTimeout(() => {
-      const socket = socketRef.current
-      if (socket?.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: 'scene', scene: { elements, files } }))
-      }
-    }, 120)
-  }, [readOnly])
+  const { status, error, viewOnly, onChange, onPointerUpdate } = useCanvasSync(api, roomId, fetchTicket, readOnly)
 
   const statusView = status === 'live'
     ? { label: 'Live', dot: 'bg-success' }
@@ -137,13 +50,14 @@ export function SharedCanvasPanel({ roomId, fetchTicket, header, className, read
         </span>
       </div>
       <div className="relative min-h-0 flex-1">
-        {status === 'error' && <CanvasMessage tone="danger">The whiteboard server can't be reached. Reconnecting…</CanvasMessage>}
+        {error && <div className="absolute inset-x-0 top-0 z-20 bg-surface" role="alert"><CanvasMessage tone="danger">{error}</CanvasMessage></div>}
         <div className="absolute inset-0">
           <Excalidraw
             excalidrawAPI={setApi}
             onChange={onChange}
+            onPointerUpdate={onPointerUpdate}
             isCollaborating
-            viewModeEnabled={readOnly}
+            viewModeEnabled={viewOnly}
             theme="dark"
             name="InnerView whiteboard"
             autoFocus={false}

@@ -241,7 +241,7 @@ export function InterviewRoom({ joined, devices, takeover, onRejoin }: Interview
       {whiteboardMounted && (
         <div className={cn('h-full', activeTab !== 'whiteboard' && 'hidden')}>
           <Suspense fallback={<PanelFallback className="h-full" />}>
-            <SharedCanvasPanel roomId={code} fetchTicket={realtime.fetchTicket} header={tabs} />
+            <SharedCanvasPanel roomId={code} fetchTicket={realtime.fetchTicket} readOnly={realtime.me.readonly} header={tabs} />
           </Suspense>
         </div>
       )}
