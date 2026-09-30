@@ -201,6 +201,17 @@ server (`innerview-canvas`, source in `services/nodejs/collaboration-canvas`). D
 per room in the `canvas-data` volume. The server accepts only valid InnerView room tickets (it shares
 `JWT_SECRET` with the backend). No license key is needed.
 
+When updating the whiteboard, rebuild **both** the frontend and canvas service. Restarting
+existing containers does not update their bundled application code:
+
+```bash
+docker compose up -d --build frontend canvas
+```
+
+Run this from the updated checkout on the host serving the interview URL (keep the production
+Compose overrides enabled when deploying to production). Then reload the interview page to
+load the new frontend. The entry page revalidates on each visit; hashed JS/CSS files remain cached.
+
 ## Shared code editor and notes (Hocuspocus)
 
 The code editor, the problem statement and the interviewers' private notes are Yjs documents on a
