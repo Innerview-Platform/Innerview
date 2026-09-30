@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { CaptureUpdateAction, Excalidraw } from '@excalidraw/excalidraw'
+import { CaptureUpdateAction, Excalidraw, reconcileElements } from '@excalidraw/excalidraw'
 import type { BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
+import type { RemoteExcalidrawElement } from '@excalidraw/excalidraw/data/reconcile'
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import '@excalidraw/excalidraw/index.css'
 import { AlertTriangle } from 'lucide-react'
@@ -46,7 +47,14 @@ export function SharedCanvasPanel({ roomId, fetchTicket, header, className, read
       return
     }
     applyingRemote.current = true
-    api.updateScene({ elements: scene.elements, captureUpdate: CaptureUpdateAction.NEVER })
+    // Replies can describe an older scene than the one currently being drawn.
+    // Reconcile keeps unsent/newer local strokes, deletion tombstones, and active edits.
+    const elements = reconcileElements(
+      api.getSceneElementsIncludingDeleted(),
+      scene.elements as readonly RemoteExcalidrawElement[],
+      api.getAppState(),
+    )
+    api.updateScene({ elements, captureUpdate: CaptureUpdateAction.NEVER })
     api.addFiles(Object.values(scene.files))
     queueMicrotask(() => { applyingRemote.current = false })
   }, [api])
@@ -114,10 +122,14 @@ export function SharedCanvasPanel({ roomId, fetchTicket, header, className, read
     sendTimer.current = setTimeout(() => {
       const socket = socketRef.current
       if (socket?.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: 'scene', scene: { elements, files } }))
+        // Read at send time: a remote merge may have happened during the debounce.
+        socket.send(JSON.stringify({ type: 'scene', scene: {
+          elements: api?.getSceneElementsIncludingDeleted() ?? elements,
+          files: api?.getFiles() ?? files,
+        } }))
       }
     }, 120)
-  }, [readOnly])
+  }, [readOnly, api])
 
   const statusView = status === 'live'
     ? { label: 'Live', dot: 'bg-success' }

@@ -22,8 +22,9 @@ function mergeScene(current: Scene, incoming: Scene): Scene {
     if (!id) continue
     const previous = elements.get(id) as { version?: number; versionNonce?: number } | undefined
     const next = element as { version?: number; versionNonce?: number }
+    // Excalidraw resolves equal-version conflicts using the lower nonce.
     if (!previous || (next.version ?? 0) > (previous.version ?? 0) ||
-      ((next.version ?? 0) === (previous.version ?? 0) && (next.versionNonce ?? 0) > (previous.versionNonce ?? 0))) {
+      ((next.version ?? 0) === (previous.version ?? 0) && (next.versionNonce ?? 0) < (previous.versionNonce ?? 0))) {
       elements.set(id, element)
     }
   }
