@@ -154,8 +154,11 @@ services:
     environment:
       JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-for-dev-only-change-in-production}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-    volumes:
-      - canvas-data:/data
+      CANVAS_REDIS_URL: redis://redis:6379
+      CANVAS_RETENTION_DAYS: ${CANVAS_RETENTION_DAYS:-180}
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:5858/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
       interval: 30s
@@ -223,7 +226,6 @@ volumes:
   mysql-data:
   redis-data:
   piston-packages:
-  canvas-data:
   editor-data:
 
 networks:

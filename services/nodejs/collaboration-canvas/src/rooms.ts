@@ -1,13 +1,7 @@
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
-import Database from 'better-sqlite3'
 import WebSocket from 'ws'
-import { config } from './config.ts'
+import { store } from './store.ts'
 
-const ROOMS_DIR = join(config.dataDir, 'rooms')
-mkdirSync(ROOMS_DIR, { recursive: true })
-
-/** Interview room ids are short alphanumeric codes; anything else is rejected before touching disk. */
+/** Interview room ids are short alphanumeric codes; anything else is rejected before accessing storage. */
 export const ROOM_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
 
 export interface Scene {
@@ -38,33 +32,46 @@ function mergeScene(current: Scene, incoming: Scene): Scene {
 
 /** One persisted Excalidraw scene and its live room sockets. */
 export class CanvasRoom {
-  private readonly db: Database.Database
+  private pending: Promise<void> = Promise.resolve()
+  private ended = false
+  closing = false
   private readonly sessions = new Set<Session>()
   private scene: Scene = { elements: [], files: {} }
   private closed = false
 
   constructor(readonly roomId: string, private readonly onEmpty: () => void) {
-    this.db = new Database(join(ROOMS_DIR, `${roomId}.db`))
-    this.db.pragma('journal_mode = WAL')
-    this.db.exec('CREATE TABLE IF NOT EXISTS excalidraw_scene (id INTEGER PRIMARY KEY CHECK (id = 1), data TEXT NOT NULL)')
-    const stored = this.db.prepare('SELECT data FROM excalidraw_scene WHERE id = 1').get() as { data: string } | undefined
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored.data) as Partial<Scene>
-        if (Array.isArray(parsed.elements) && parsed.files && typeof parsed.files === 'object') {
-          this.scene = { elements: parsed.elements, files: parsed.files as Record<string, unknown> }
-        }
-      } catch {
-        console.warn(`[canvas] ignored invalid stored scene for room ${roomId}`)
+  }
+
+  async load() {
+    const stored = await store.load(this.roomId)
+    this.ended = stored.closed
+    if (stored.scene) {
+      const parsed = JSON.parse(stored.scene) as Partial<Scene>
+      if (!Array.isArray(parsed.elements) || !parsed.files || typeof parsed.files !== 'object') {
+        throw new Error(`Invalid stored scene for room ${this.roomId}`)
       }
+      this.scene = { elements: parsed.elements, files: parsed.files }
     }
   }
 
+  end() {
+    this.closing = true
+    this.ended = true
+  }
+
   connect(session: Session) {
+    if (this.closed) {
+      session.socket.close(1011, 'Room reloading')
+      return
+    }
+    if (socketClosed(session.socket)) {
+      if (this.sessions.size === 0) this.onEmpty()
+      return
+    }
     this.sessions.add(session)
     this.send(session.socket, { type: 'scene', scene: this.scene })
     session.socket.on('message', (raw, isBinary) => {
-      if (isBinary || session.readonly || isRoomClosed(this.roomId)) return
+      if (isBinary || session.readonly || this.ended || this.closed) return
       let message: { type?: unknown; scene?: Partial<Scene> }
       try {
         message = JSON.parse(raw.toString()) as typeof message
@@ -77,13 +84,19 @@ export class CanvasRoom {
         elements: message.scene.elements,
         files: message.scene.files as Record<string, unknown>,
       })
-      this.db.prepare('INSERT INTO excalidraw_scene (id, data) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data')
-        .run(JSON.stringify(this.scene))
-      this.broadcast({ type: 'scene', scene: this.scene })
+      const scene = JSON.stringify(this.scene)
+      this.pending = this.pending.then(async () => {
+        await store.save(this.roomId, scene)
+        this.broadcast({ type: 'scene', scene: JSON.parse(scene) })
+      }).catch((error) => {
+        console.error(`[canvas] failed to persist room ${this.roomId}`, error)
+        this.closed = true
+        for (const { socket } of this.sessions) socket.close(1011, 'Storage unavailable')
+      })
     })
     session.socket.on('close', () => {
       this.sessions.delete(session)
-      if (this.sessions.size === 0 && !this.closed) this.onEmpty()
+      if (this.sessions.size === 0) this.onEmpty()
     })
   }
 
@@ -97,11 +110,18 @@ export class CanvasRoom {
     return disconnected
   }
 
-  close() {
-    if (this.closed) return
+  async flush() {
+    let pending: Promise<void>
+    do {
+      pending = this.pending
+      await pending
+    } while (pending !== this.pending)
+  }
+
+  async close() {
     this.closed = true
     for (const session of this.sessions) session.socket.close(1001, 'Room closed')
-    this.db.close()
+    await this.pending
   }
 
   get sessionCount() {
@@ -120,57 +140,49 @@ export class CanvasRoom {
   }
 }
 
-const rooms = new Map<string, CanvasRoom>()
+function socketClosed(socket: WebSocket) {
+  return socket.readyState !== WebSocket.OPEN
+}
 
-export function getOrCreateRoom(roomId: string): CanvasRoom {
+// Share room loads and keep idle rooms until pending writes finish.
+const rooms = new Map<string, Promise<CanvasRoom>>()
+
+export function getOrCreateRoom(roomId: string): Promise<CanvasRoom> {
   const existing = rooms.get(roomId)
   if (existing) return existing
-  let room: CanvasRoom
-  room = new CanvasRoom(roomId, () => {
-    console.log(`[canvas] room ${roomId} is empty, unloading`)
-    room.close()
-    rooms.delete(roomId)
+  const room = new CanvasRoom(roomId, () => {
+    void room.flush().then(() => {
+      if (room.sessionCount === 0 && !room.closing && rooms.get(roomId) === loading) rooms.delete(roomId)
+    })
   })
-  rooms.set(roomId, room)
-  console.log(`[canvas] room ${roomId} loaded`)
-  return room
+  const loading = room.load().then(() => room).catch((error) => {
+    rooms.delete(roomId)
+    throw error
+  })
+  rooms.set(roomId, loading)
+  return loading
 }
 
-const closedMarker = (roomId: string) => join(ROOMS_DIR, `${roomId}.closed`)
-
-/** The interview ended: disconnect everyone; later connections are read-only (summary page). */
-export function closeRoom(roomId: string) {
-  writeFileSync(closedMarker(roomId), new Date().toISOString())
-  const room = rooms.get(roomId)
-  if (room) room.close()
-  rooms.delete(roomId)
+/** The interview ended: disconnect everyone; later connections are read-only. */
+export async function closeRoom(roomId: string) {
+  const room = await getOrCreateRoom(roomId)
+  room.end()
+  const current = rooms.get(roomId)
+  await store.closeRoom(roomId)
+  await room.close()
+  if (rooms.get(roomId) === current) rooms.delete(roomId)
 }
 
-export function isRoomClosed(roomId: string) {
-  return existsSync(closedMarker(roomId))
+export async function revokeUser(roomId: string, userId: string): Promise<number> {
+  return (await rooms.get(roomId))?.disconnectUser(userId) ?? 0
 }
 
-/** Disconnects one user (removed from the interview, or their permissions changed). */
-export function revokeUser(roomId: string, userId: string): number {
-  return rooms.get(roomId)?.disconnectUser(userId) ?? 0
+export async function deleteOldRooms(days: number): Promise<number> {
+  return store.deleteOldRooms(days, (roomId) => rooms.has(roomId))
 }
 
-/** Deletes whiteboards of interviews that ended more than `days` ago (never ones that are open). */
-export function deleteOldRooms(days: number): number {
-  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000
-  let deleted = 0
-  for (const file of readdirSync(ROOMS_DIR)) {
-    if (!file.endsWith('.closed')) continue
-    const roomId = file.slice(0, -'.closed'.length)
-    if (rooms.has(roomId) || statSync(join(ROOMS_DIR, file)).mtimeMs > cutoff) continue
-    for (const suffix of ['.db', '.db-wal', '.db-shm', '.closed']) rmSync(join(ROOMS_DIR, roomId + suffix), { force: true })
-    deleted++
-  }
-  return deleted
-}
-
-export function closeAllRooms() {
-  for (const room of rooms.values()) room.close()
+export async function closeAllRooms() {
+  await Promise.all([...rooms.values()].map(async (room) => (await room).close()))
   rooms.clear()
 }
 

@@ -10,19 +10,19 @@
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../../.env src/index.ts",
     "start": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "11.3.0",
     "@fastify/websocket": "11.3.1",
-    "better-sqlite3": "12.11.1",
     "fastify": "5.12.5",
     "jose": "6.2.12",
+    "redis": "6.2.1",
     "tsx": "4.23.15",
     "ws": "8.22.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "7.6.13",
     "@types/node": "22.20.4",
     "@types/ws": "8.18.1",
     "typescript": "5.9.3"

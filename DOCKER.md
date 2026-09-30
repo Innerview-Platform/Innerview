@@ -198,7 +198,7 @@ so programs that read stdin until end-of-file keep waiting — press **Stop** to
 
 The room's **Whiteboard** tab is an [Excalidraw](https://excalidraw.com) canvas synced through a self-hosted
 server (`innerview-canvas`, source in `services/nodejs/collaboration-canvas`). Drawings are stored
-per room in the `canvas-data` volume. The server accepts only valid InnerView room tickets (it shares
+per room in Redis, backed by the `redis-data` volume. The server accepts only valid InnerView room tickets (it shares
 `JWT_SECRET` with the backend). No license key is needed.
 
 ## Shared code editor and notes (Hocuspocus)

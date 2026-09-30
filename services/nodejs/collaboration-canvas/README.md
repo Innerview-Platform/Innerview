@@ -9,7 +9,7 @@ Self-hosted Excalidraw scene sync server behind the interview room's **Whiteboar
 | `POST /internal/rooms/:room/:action` | Backend room close and user revoke hooks |
 
 - **Auth** — sockets need a valid InnerView room ticket, verified with the backend's `JWT_SECRET` (HS256).
-- **Storage** — one SQLite file per room in `$CANVAS_DATA_DIR/rooms` (default `./data`). Drawings survive restarts and everyone leaving.
+- **Storage** — Redis hashes at `room:{roomId}:canvas` store scenes (including image files) and read-only end markers. Drawings survive canvas restarts and everyone leaving; Redis must have persistence enabled (Docker Compose uses the `redis-data` volume and RDB snapshots). Redis snapshot frequency determines potential data loss after a Redis crash.
 - **Read-only** — review tickets and ended interviews can receive scenes but cannot submit changes.
 - **Retention** — ended boards are deleted after `CANVAS_RETENTION_DAYS` (default 180).
 
@@ -26,5 +26,8 @@ The frontend reaches it at `/canvas/*` on its own origin (Vite proxy in developm
 |---|---|---|
 | `JWT_SECRET` | — (required) | Same secret as the Spring backend |
 | `CANVAS_PORT` | `5858` | |
-| `CANVAS_DATA_DIR` | `./data` | Room scenes |
+| `CANVAS_REDIS_URL` | `redis://localhost:6379` | Overrides `REDIS_HOST` / `REDIS_PORT`; supports Redis authentication and TLS URLs |
+| `CANVAS_RETENTION_DAYS` | `180` | Ended-board retention |
 | `FRONTEND_URL` | `http://localhost:3000` | Allowed CORS origin(s), comma separated |
+
+Existing SQLite files are not automatically imported. Back up the old `canvas-data` volume before switching; those drawings require a separate migration to Redis. The code editor has its own SQLite storage and is unaffected.
