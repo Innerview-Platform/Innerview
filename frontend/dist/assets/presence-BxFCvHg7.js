@@ -1,1 +1,0 @@
-var e=[`#818cf8`,`#f472b6`,`#34d399`,`#fbbf24`,`#60a5fa`,`#f87171`,`#a78bfa`,`#2dd4bf`];function t(t){let n=0;for(let e of t)n=n*31+e.charCodeAt(0)|0;return e[Math.abs(n)%e.length]}export{t};

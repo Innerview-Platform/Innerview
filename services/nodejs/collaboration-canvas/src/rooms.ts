@@ -1,10 +1,8 @@
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { randomUUID } from 'node:crypto'
 import Database from 'better-sqlite3'
 import WebSocket from 'ws'
 import { config } from './config.ts'
-import { isRecord, isScene, MAX_SCENE_BYTES, mergeScene, type Scene } from './scene.ts'
 
 const ROOMS_DIR = join(config.dataDir, 'rooms')
 mkdirSync(ROOMS_DIR, { recursive: true })
@@ -12,24 +10,36 @@ mkdirSync(ROOMS_DIR, { recursive: true })
 /** Interview room ids are short alphanumeric codes; anything else is rejected before touching disk. */
 export const ROOM_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
 
+export interface Scene {
+  elements: unknown[]
+  files: Record<string, unknown>
+}
+
 interface Session {
   socket: WebSocket
   userId: string
-  name: string
   readonly: boolean
 }
 
-interface ConnectedSession extends Session {
-  sessionId: string
-  pointer?: { x: number; y: number }
-  button?: 'up' | 'down'
-  selectedElementIds?: Record<string, boolean>
+function mergeScene(current: Scene, incoming: Scene): Scene {
+  const elements = new Map(current.elements.map((element) => [(element as { id?: string }).id, element]))
+  for (const element of incoming.elements) {
+    const id = (element as { id?: string }).id
+    if (!id) continue
+    const previous = elements.get(id) as { version?: number; versionNonce?: number } | undefined
+    const next = element as { version?: number; versionNonce?: number }
+    if (!previous || (next.version ?? 0) > (previous.version ?? 0) ||
+      ((next.version ?? 0) === (previous.version ?? 0) && (next.versionNonce ?? 0) > (previous.versionNonce ?? 0))) {
+      elements.set(id, element)
+    }
+  }
+  return { elements: [...elements.values()], files: { ...current.files, ...incoming.files } }
 }
 
 /** One persisted Excalidraw scene and its live room sockets. */
 export class CanvasRoom {
   private readonly db: Database.Database
-  private readonly sessions = new Set<ConnectedSession>()
+  private readonly sessions = new Set<Session>()
   private scene: Scene = { elements: [], files: {} }
   private closed = false
 
@@ -40,61 +50,39 @@ export class CanvasRoom {
     const stored = this.db.prepare('SELECT data FROM excalidraw_scene WHERE id = 1').get() as { data: string } | undefined
     if (stored) {
       try {
-        const parsed: unknown = JSON.parse(stored.data)
-        if (!isScene(parsed)) throw new Error('Invalid scene')
-        this.scene = parsed
+        const parsed = JSON.parse(stored.data) as Partial<Scene>
+        if (Array.isArray(parsed.elements) && parsed.files && typeof parsed.files === 'object') {
+          this.scene = { elements: parsed.elements, files: parsed.files as Record<string, unknown> }
+        }
       } catch {
         console.warn(`[canvas] ignored invalid stored scene for room ${roomId}`)
       }
     }
   }
 
-  connect(input: Session) {
-    const session: ConnectedSession = { ...input, sessionId: randomUUID() }
+  connect(session: Session) {
     this.sessions.add(session)
-    this.send(session.socket, { type: 'scene', scene: this.scene, readonly: session.readonly, sessionId: session.sessionId })
-    this.broadcastPresence()
+    this.send(session.socket, { type: 'scene', scene: this.scene })
     session.socket.on('message', (raw, isBinary) => {
-      if (isBinary || this.closed || session.socket.readyState !== WebSocket.OPEN) return
-      let message: unknown
+      if (isBinary || session.readonly || isRoomClosed(this.roomId)) return
+      let message: { type?: unknown; scene?: Partial<Scene> }
       try {
-        message = JSON.parse(raw.toString())
+        message = JSON.parse(raw.toString()) as typeof message
       } catch {
         return
       }
-      if (!isRecord(message)) return
-      if (message.type === 'presence') {
-        if (!isRecord(message.pointer) || !Number.isFinite(message.pointer.x) || !Number.isFinite(message.pointer.y)) return
-        session.pointer = { x: Number(message.pointer.x), y: Number(message.pointer.y) }
-        session.button = message.button === 'down' ? 'down' : 'up'
-        if (isRecord(message.selectedElementIds)) {
-          session.selectedElementIds = Object.fromEntries(Object.entries(message.selectedElementIds)
-            .filter(([, selected]) => selected === true).slice(0, 1000)) as Record<string, boolean>
-        }
-        this.broadcastPresence()
-        return
-      }
-      if (session.readonly || isRoomClosed(this.roomId) || message.type !== 'scene' || !isScene(message.scene)) return
-      const next = mergeScene(this.scene, message.scene)
-      const data = JSON.stringify(next)
-      if (Buffer.byteLength(data) > MAX_SCENE_BYTES - 1024) {
-        this.send(session.socket, { type: 'error', message: 'This whiteboard is too large to sync. Remove large images and try again.' })
-        return
-      }
-      if (data === JSON.stringify(this.scene)) {
-        this.send(session.socket, { type: 'scene', scene: { elements: this.scene.elements, files: {} } })
-        return
-      }
-      const changedFiles = Object.fromEntries(Object.entries(next.files)
-        .filter(([id, file]) => JSON.stringify(file) !== JSON.stringify(this.scene.files[id])))
+      if (message.type !== 'scene' || !Array.isArray(message.scene?.elements) || !message.scene.files || typeof message.scene.files !== 'object') return
+
+      this.scene = mergeScene(this.scene, {
+        elements: message.scene.elements,
+        files: message.scene.files as Record<string, unknown>,
+      })
       this.db.prepare('INSERT INTO excalidraw_scene (id, data) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data')
-        .run(data)
-      this.scene = next
-      this.broadcast({ type: 'scene', scene: { elements: this.scene.elements, files: changedFiles } })
+        .run(JSON.stringify(this.scene))
+      this.broadcast({ type: 'scene', scene: this.scene })
     })
     session.socket.on('close', () => {
       this.sessions.delete(session)
-      if (!this.closed) this.broadcastPresence()
       if (this.sessions.size === 0 && !this.closed) this.onEmpty()
     })
   }
@@ -103,8 +91,7 @@ export class CanvasRoom {
     let disconnected = 0
     for (const session of this.sessions) {
       if (session.userId !== userId) continue
-      session.readonly = true
-      session.socket.close(4403, 'FORBIDDEN')
+      session.socket.close(1008, 'FORBIDDEN')
       disconnected++
     }
     return disconnected
@@ -117,8 +104,8 @@ export class CanvasRoom {
     this.db.close()
   }
 
-  private broadcastPresence() {
-    this.broadcast({ type: 'presence', peers: [...this.sessions].map(({ socket: _socket, readonly: _readonly, ...peer }) => peer) })
+  get sessionCount() {
+    return this.sessions.size
   }
 
   private broadcast(message: unknown) {

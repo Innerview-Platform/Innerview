@@ -48,4 +48,4 @@ application.properties
 .vscode/
 .idea/*.xml
 node_modules/
-/frontend/public/excalidraw/
+

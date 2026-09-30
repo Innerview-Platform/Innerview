@@ -1,1 +1,0 @@
-import{t as e}from"./jsx-runtime-B-G0DNmd.js";import{t}from"./utils-BkOYZs2U.js";var n=e(),r={sm:`h-4 w-4 border-2`,md:`h-6 w-6 border-2`,lg:`h-9 w-9 border-[3px]`};function i({size:e=`md`,className:i}){return(0,n.jsx)(`span`,{role:`status`,"aria-label":`Loading`,className:t(`inline-block animate-spin rounded-full border-current border-t-transparent`,r[e],i)})}export{i as t};

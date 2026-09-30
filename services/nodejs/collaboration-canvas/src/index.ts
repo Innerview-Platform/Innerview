@@ -8,10 +8,8 @@
 import cors from '@fastify/cors'
 import websocketPlugin from '@fastify/websocket'
 import fastify, { LogController } from 'fastify'
-import WebSocket from 'ws'
 import { internalToken, verifyTicket } from './auth.ts'
 import { config } from './config.ts'
-import { MAX_SCENE_BYTES } from './scene.ts'
 import { activeRoomCount, closeAllRooms, closeRoom, deleteOldRooms, getOrCreateRoom, isRoomClosed, revokeUser, ROOM_ID_PATTERN } from './rooms.ts'
 
 // Request logging is off because sync URLs carry the access token in their query string.
@@ -20,8 +18,8 @@ const app = fastify({
   logController: new LogController({ disableRequestLogging: true }),
 })
 
-await app.register(websocketPlugin, { options: { maxPayload: MAX_SCENE_BYTES } })
-await app.register(cors, { origin: config.corsOrigins, methods: ['GET'] })
+await app.register(websocketPlugin, { options: { maxPayload: 8 * 1024 * 1024 } })
+await app.register(cors, { origin: config.corsOrigins, methods: ['GET', 'PUT'] })
 
 app.get('/health', async () => ({ status: 'UP', rooms: activeRoomCount() }))
 
@@ -32,7 +30,6 @@ app.get<{ Params: { roomId: string }; Querystring: { token?: string } }>(
     const { roomId } = req.params
     const { token } = req.query
     const ticket = await verifyTicket(token)
-    if (socket.readyState !== WebSocket.OPEN) return
 
     if (!ticket) {
       socket.close(4401, 'NOT_AUTHENTICATED')
@@ -49,7 +46,7 @@ app.get<{ Params: { roomId: string }; Querystring: { token?: string } }>(
 
     // Observers, review tickets and ended interviews see the board but can't change it.
     const isReadonly = ticket.readonly || isRoomClosed(roomId)
-    getOrCreateRoom(roomId).connect({ socket, userId: ticket.userId, name: ticket.name, readonly: isReadonly })
+    getOrCreateRoom(roomId).connect({ socket, userId: ticket.userId, readonly: isReadonly })
     console.log(`[canvas] user ${ticket.userId} joined room ${roomId}${isReadonly ? ' (read-only)' : ''}`)
   },
 )

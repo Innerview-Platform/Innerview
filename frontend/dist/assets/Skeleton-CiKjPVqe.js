@@ -1,0 +1,1 @@
+import{i as e,u as t}from"./Button-Bitl2Qoc.js";var n=t();function r({className:t}){return(0,n.jsx)(`div`,{className:e(`skeleton`,t),"aria-hidden":!0})}function i({rows:t=3,className:i}){return(0,n.jsx)(`div`,{className:e(`space-y-3`,i),role:`status`,"aria-label":`Loading`,children:Array.from({length:t},(e,t)=>(0,n.jsx)(r,{className:`h-12 w-full`},t))})}export{i as n,r as t};
