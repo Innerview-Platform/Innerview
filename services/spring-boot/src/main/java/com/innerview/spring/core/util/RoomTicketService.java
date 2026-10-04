@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Room tickets: short-lived proofs of room membership, required by every room-scoped service (STOMP
- * CONNECT, LiveKit tokens, the code runner, the Hocuspocus editor server and the tldraw server).
+ * CONNECT, LiveKit tokens, the code runner, the Hocuspocus editor server and the Excalidraw server).
  *
  * <p>Tickets are signed with a key <em>derived</em> from {@code JWT_SECRET} (HMAC-SHA256 of a fixed
  * label), so a ticket is never accepted as an access token and vice versa. The Node services derive

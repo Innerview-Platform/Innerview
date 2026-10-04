@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/api': { target: proxyTarget, changeOrigin: true, ...stripOrigin },
         '/ws-signal': { target: proxyTarget, ws: true, changeOrigin: true, ...stripOrigin },
-        // tldraw sync server (services/nodejs/collaboration-canvas) for the shared whiteboard.
+        // Excalidraw sync server (services/nodejs/collaboration-canvas) for the shared whiteboard.
         '/canvas': { target: canvasTarget, ws: true, changeOrigin: true, rewrite: (p) => p.replace(/^\/canvas/, '') },
         // Hocuspocus server (services/nodejs/collaboration-editor) for the shared code editor and notes.
         '/collab': { target: editorTarget, ws: true, changeOrigin: true, rewrite: (p) => p.replace(/^\/collab/, '') },

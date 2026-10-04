@@ -68,7 +68,7 @@ export function useRoomRealtime({ code, initialState, initialMe, initialTicket, 
   const [subscribeLobby, emitLobby] = useListeners<LobbyMessage>()
   const [subscribeError, emitError] = useListeners<RoomError>()
 
-  /** A room ticket for the other services (Hocuspocus, tldraw); reuses the join ticket first. */
+  /** A room ticket for the other services (Hocuspocus, Excalidraw); reuses the join ticket first. */
   const getTicket = useCallback(async (): Promise<string | null> => {
     const cached = ticketRef.current
     if (cached) {
@@ -122,7 +122,7 @@ export function useRoomRealtime({ code, initialState, initialMe, initialTicket, 
 
   const send = useCallback((type: OutgoingSignalType, payload?: unknown) => socketRef.current?.send(type, payload) ?? false, [])
   const reconnect = useCallback(() => setConnectionAttempt((n) => n + 1), [])
-  /** Ticket fetcher for Hocuspocus / tldraw (always fresh). */
+  /** Ticket fetcher for Hocuspocus / Excalidraw (always fresh). */
   const fetchTicket = useCallback(async () => (await roomApi.ticket(code)).ticket, [code])
 
   return {

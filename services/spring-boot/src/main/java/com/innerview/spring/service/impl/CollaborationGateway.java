@@ -14,7 +14,7 @@ import org.springframework.web.client.RestClient;
 
 /**
  * Talks to the internal APIs of the collaboration services: the Hocuspocus editor server (code,
- * problem notes, private interviewer notes) and the tldraw whiteboard server. Calls are best-effort:
+ * problem notes, private interviewer notes) and the Excalidraw whiteboard server. Calls are best-effort:
  * a failure is logged and never blocks the interview flow.
  */
 @Slf4j

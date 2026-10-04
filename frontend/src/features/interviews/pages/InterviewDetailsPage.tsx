@@ -134,7 +134,7 @@ export default function InterviewDetailsPage() {
                 {tab === 'private' && <Preformatted text={d.interviewerNotes} empty="No private notes." />}
                 {tab === 'whiteboard' && (
                   <Suspense fallback={<div className="flex h-full items-center justify-center"><Spinner /></div>}>
-                    <SharedCanvasPanel roomId={d.code} fetchTicket={reviewTicket} user={{ id: me.id, name: me.email.split('@')[0] }} className="rounded-none border-0" />
+                    <SharedCanvasPanel roomId={d.code} fetchTicket={reviewTicket} readOnly className="rounded-none border-0" />
                   </Suspense>
                 )}
                 {tab === 'chat' && (

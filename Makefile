@@ -3,7 +3,7 @@
 #   make dev       start supporting containers, then run backend, whiteboard server and frontend locally (Ctrl+C stops all)
 #   make infra     start only the supporting containers (Piston, Redis, DynamoDB, LiveKit)
 #   make backend   run the Spring Boot backend on :8080
-#   make canvas    run the tldraw whiteboard sync server on :5858
+#   make canvas    run the Excalidraw whiteboard sync server on :5858
 #   make editor    run the Hocuspocus server (shared code editor + notes) on :1234
 #   make frontend  run the Vite dev server on :3000
 #   make kill      stop whatever is listening on the dev ports (e.g. a `make dev` left running elsewhere)

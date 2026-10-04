@@ -4,7 +4,7 @@ export const config = {
   /** Empty string means "same origin as the SPA" — see README for why that is required. */
   apiBaseUrl: trimTrailingSlash(import.meta.env.VITE_API_BASE_URL ?? ''),
   livekitUrl: import.meta.env.VITE_LIVEKIT_URL ?? '',
-  /** tldraw sync server; defaults to `/canvas` on the SPA's origin (proxied by Vite / nginx). */
+  /** Excalidraw sync server; defaults to `/canvas` on the SPA's origin (proxied by Vite / nginx). */
   canvasBaseUrl: trimTrailingSlash(import.meta.env.VITE_CANVAS_URL ?? '/canvas'),
   /** Hocuspocus server for the shared code editor and notes; defaults to `/collab` on the SPA's origin. */
   collabBaseUrl: trimTrailingSlash(import.meta.env.VITE_COLLAB_URL ?? '/collab'),
