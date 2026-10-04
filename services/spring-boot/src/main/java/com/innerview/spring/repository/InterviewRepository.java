@@ -35,4 +35,8 @@ public interface InterviewRepository extends JpaRepository<Interview, Long> {
     Optional<Interview> findByIdWithProblems(@Param("id") Long id);
 
     Optional<Interview> findByRoomId(String roomId);
+
+    List<Interview> findByStatusAndEndTimeBefore(InterviewStatus status, Instant time);
+
+    List<Interview> findByStatusAndStartTimeBefore(InterviewStatus status, Instant time);
 }
