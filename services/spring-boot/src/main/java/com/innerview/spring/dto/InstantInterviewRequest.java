@@ -15,4 +15,10 @@ public class InstantInterviewRequest {
   @NotNull InterviewRole creatorInterviewRole;
   Integer durationMinutes;
   List<UUID> problemIds;
+  /** Optional name for the interview. */
+  String title;
+  /** Who may enter without being let in (default ASK_TO_JOIN). */
+  com.innerview.spring.enums.AccessPolicy accessPolicy;
+  /** People to invite by email. */
+  java.util.List<com.innerview.spring.dto.room.InviteRequest.Invitee> invitees;
 }
