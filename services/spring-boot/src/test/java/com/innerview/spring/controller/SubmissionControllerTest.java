@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import com.innerview.spring.core.util.RevokedUsers;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -35,7 +36,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(SubmissionController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(SubmissionExceptionHandler.class)
+// JwtFilter is created by the web slice and needs RevokedUsers.
+@Import({SubmissionExceptionHandler.class, RevokedUsers.class})
 class SubmissionControllerTest {
 
     @Autowired

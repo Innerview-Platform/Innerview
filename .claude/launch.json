@@ -4,8 +4,37 @@
     {
       "name": "innerview-web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "frontend",
+        "run",
+        "dev"
+      ],
       "port": 3000
+    },
+    {
+      "name": "innerview-backend",
+      "runtimeExecutable": "make",
+      "runtimeArgs": [
+        "backend"
+      ],
+      "port": 8080
+    },
+    {
+      "name": "innerview-canvas",
+      "runtimeExecutable": "make",
+      "runtimeArgs": [
+        "canvas"
+      ],
+      "port": 5858
+    },
+    {
+      "name": "innerview-editor",
+      "runtimeExecutable": "make",
+      "runtimeArgs": [
+        "editor"
+      ],
+      "port": 1234
     }
   ]
 }

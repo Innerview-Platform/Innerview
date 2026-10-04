@@ -1,14 +1,18 @@
 package com.innerview.spring.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.innerview.spring.dto.*;
+import com.innerview.spring.dto.InterviewHistoryDto;
+import com.innerview.spring.dto.UserAverageRatingResponse;
 import com.innerview.spring.enums.ExperienceLevel;
 import com.innerview.spring.enums.InterviewRole;
 import com.innerview.spring.enums.InterviewStatus;
 import com.innerview.spring.enums.InterviewType;
-import com.innerview.spring.exception.UserHasProfile;
+import com.innerview.spring.dto.profile.MyProfileResponse;
+import com.innerview.spring.dto.profile.PublicProfileResponse;
+import com.innerview.spring.dto.profile.UpdateProfileRequest;
+import com.innerview.spring.enums.EmploymentStatus;
+import com.innerview.spring.exception.ApiException;
+import com.innerview.spring.exception.ApiExceptionHandler;
 import com.innerview.spring.exception.UserExceptionHandler;
-import com.innerview.spring.exception.UserProfileNotFound;
 import com.innerview.spring.exception.UserNotFound;
 import com.innerview.spring.service.UserProfileService;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,7 +56,6 @@ public class UserProfileControllerTest {
     @InjectMocks
     private UserProfileController userProfileController;
 
-    private ObjectMapper objectMapper = new ObjectMapper();
     private UUID currentUserId;
 
     @BeforeEach
@@ -61,7 +64,7 @@ public class UserProfileControllerTest {
 
         // Setup MockMvc with custom ArgumentResolver to mock @AuthenticationPrincipal
         mockMvc = MockMvcBuilders.standaloneSetup(userProfileController)
-                .setControllerAdvice(new UserExceptionHandler()) // Wire in your exception handler
+                .setControllerAdvice(new UserExceptionHandler(), new ApiExceptionHandler()) // Wire in your exception handler
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
                     @Override
                     public boolean supportsParameter(MethodParameter parameter) {
@@ -78,112 +81,83 @@ public class UserProfileControllerTest {
     }
 
 
-    @Test
-    void createProfile_ShouldCreateProfileSuccessfully() throws Exception {
-        CreateProfileRequest request = new CreateProfileRequest();
-        request.setBio("Backend Developer");
+    // ==================== 1. Own profile ====================
 
-        UserProfileResponse response = new UserProfileResponse();
-        response.setUserId(currentUserId);
-        response.setBio("Backend Developer");
-
-        when(userProfileService.createProfile(eq(currentUserId), any(CreateProfileRequest.class))).thenReturn(response);
-
-        mockMvc.perform(post("/api/profile")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.user_id").value(currentUserId.toString()))
-                .andExpect(jsonPath("$.bio").value("Backend Developer"));
+    private MyProfileResponse myProfile(boolean complete) {
+        return new MyProfileResponse(
+                currentUserId, "jane", "Jane Doe", "jane@example.com", "Backend Engineer", EmploymentStatus.EMPLOYED,
+                "Acme", "Cairo University", "Faculty of Engineering", ExperienceLevel.JUNIOR, InterviewRole.BOTH,
+                "Bio", "Cairo", "Africa/Cairo", "https://linkedin.com/in/jane", null, null, false, true, null, null, null,
+                4.5, 2, 3, 2, 1, complete, LocalDateTime.now());
     }
 
     @Test
-    void createProfile_ShouldFailIfProfileAlreadyExists() throws Exception {
-        CreateProfileRequest request = new CreateProfileRequest();
+    void getMyProfile_ReturnsSnakeCaseProfileWithCompleteness() throws Exception {
+        when(userProfileService.getMyProfile(currentUserId)).thenReturn(myProfile(true));
 
-        when(userProfileService.createProfile(any(), any()))
-                .thenThrow(new UserHasProfile("User already has a profile"));
-
-        mockMvc.perform(post("/api/profile")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error").value("User already has a profile"));
-    }
-
-    @Test
-    void getProfile_ShouldReturnUserProfileSuccessfully() throws Exception {
-        UserProfileResponse response = new UserProfileResponse();
-        response.setUserId(currentUserId);
-        response.setBio("Existing Profile");
-
-        when(userProfileService.findProfileById(currentUserId)).thenReturn(response);
-
-        mockMvc.perform(get("/api/profile"))
+        mockMvc.perform(get("/api/profile/me"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.user_id").value(currentUserId.toString()))
-                .andExpect(jsonPath("$.bio").value("Existing Profile"));
+                .andExpect(jsonPath("$.employment_status").value("EMPLOYED"))
+                .andExpect(jsonPath("$.university").value("Cairo University"))
+                .andExpect(jsonPath("$.show_email").value(false))
+                .andExpect(jsonPath("$.profile_complete").value(true));
     }
 
     @Test
-    void getProfile_ShouldReturn404IfProfileDoesNotExist() throws Exception {
-        when(userProfileService.findProfileById(currentUserId))
-                .thenThrow(new UserProfileNotFound("Profile not found"));
+    void updateMyProfile_PassesSnakeCaseFieldsToTheService() throws Exception {
+        when(userProfileService.updateMyProfile(eq(currentUserId), any(UpdateProfileRequest.class))).thenReturn(myProfile(true));
 
-        mockMvc.perform(get("/api/profile"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("Profile not found"));
-    }
-
-    @Test
-    void updateProfile_ShouldUpdateProfileSuccessfully() throws Exception {
-        CreateProfileRequest request = new CreateProfileRequest();
-        request.setBio("Updated Bio");
-
-        UserProfileResponse response = new UserProfileResponse();
-        response.setUserId(currentUserId);
-        response.setBio("Updated Bio");
-
-        when(userProfileService.UpdateProfile(eq(currentUserId), any(CreateProfileRequest.class))).thenReturn(response);
-
-        mockMvc.perform(put("/api/profile")
+        mockMvc.perform(put("/api/profile/me")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.bio").value("Updated Bio"));
-    }
-
-    @Test
-    void updateProfile_ShouldReturn404IfProfileNotFound() throws Exception {
-        CreateProfileRequest request = new CreateProfileRequest();
-
-        when(userProfileService.UpdateProfile(any(), any()))
-                .thenThrow(new UserProfileNotFound("Profile not found"));
-
-        mockMvc.perform(put("/api/profile")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void deleteProfile_ShouldDeleteProfileSuccessfully() throws Exception {
-        doNothing().when(userProfileService).deleteUserProfileById(currentUserId);
-
-        mockMvc.perform(delete("/api/profile"))
+                        .content("{\"employment_status\":\"STUDENT\",\"linkedin_url\":\"linkedin.com/in/jane\",\"show_email\":true}"))
                 .andExpect(status().isOk());
 
-        verify(userProfileService, times(1)).deleteUserProfileById(currentUserId);
+        verify(userProfileService).updateMyProfile(eq(currentUserId), argThat(request ->
+                request.getEmploymentStatus() == EmploymentStatus.STUDENT
+                        && "linkedin.com/in/jane".equals(request.getLinkedinUrl())
+                        && Boolean.TRUE.equals(request.getShowEmail())));
     }
 
     @Test
-    void deleteProfile_ShouldReturn404IfProfileNotFound() throws Exception {
-        doThrow(new UserProfileNotFound("Profile not found")).when(userProfileService).deleteUserProfileById(currentUserId);
-
-        mockMvc.perform(delete("/api/profile"))
-                .andExpect(status().isNotFound());
+    void updateMyProfile_RejectsOversizedFields() throws Exception {
+        mockMvc.perform(put("/api/profile/me")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"headline\":\"" + "x".repeat(121) + "\"}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(userProfileService);
     }
 
+    @Test
+    void updateMyProfile_ReturnsServiceValidationErrors() throws Exception {
+        when(userProfileService.updateMyProfile(eq(currentUserId), any(UpdateProfileRequest.class)))
+                .thenThrow(ApiException.badRequest("INVALID_URL", "GitHub URL must be a github.com link."));
+
+        mockMvc.perform(put("/api/profile/me")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"github_url\":\"https://evil.example\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_URL"));
+    }
+
+    // ==================== 2. Public profile ====================
+
+    @Test
+    void getPublicProfile_LooksUpByUsername() throws Exception {
+        UUID targetUserId = UUID.randomUUID();
+        PublicProfileResponse response = new PublicProfileResponse(
+                targetUserId, "omar", "Omar", null, null, null, "SRE", EmploymentStatus.STUDENT, null, "AUC", "Engineering",
+                null, null, null, null, null, null, null, null, 4.5, 2, 3, 2, 1, LocalDateTime.now());
+        when(userProfileService.getPublicProfile(currentUserId, "Omar")).thenReturn(response);
+
+        mockMvc.perform(get("/api/profile/{username}", "Omar"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("omar"))
+                .andExpect(jsonPath("$.name").value("Omar"))
+                .andExpect(jsonPath("$.email").doesNotExist())
+                .andExpect(jsonPath("$.average_rating").value(4.5))
+                .andExpect(jsonPath("$.total_interviews").value(3));
+    }
 
     @Test
     void getUserAverageRating_ShouldReturnCorrectAverageRating() throws Exception {
@@ -226,7 +200,7 @@ public class UserProfileControllerTest {
 
     @Test
     void getUserInterviews_ShouldReturnUserInterviews() throws Exception {
-        UUID targetUserId = UUID.randomUUID();
+        UUID targetUserId = currentUserId;
         InterviewHistoryDto interview = new InterviewHistoryDto(1L, "MOCK", Instant.now(), 60, "INTERVIEWER");
 
         // FIX: Add PageRequest.of() and total elements
@@ -235,7 +209,7 @@ public class UserProfileControllerTest {
         when(userProfileService.getUserInterviewHistory(eq(targetUserId), isNull(), isNull(), eq(0), eq(10)))
                 .thenReturn(page);
 
-        mockMvc.perform(get("/api/profile/{userId}/interviews", targetUserId)
+        mockMvc.perform(get("/api/profile/me/interviews")
                         .param("page", "0")
                         .param("limit", "10"))
                 .andExpect(status().isOk())
@@ -245,7 +219,7 @@ public class UserProfileControllerTest {
 
     @Test
     void getUserInterviews_ShouldReturnEmptyListIfNoInterviewsExist() throws Exception {
-        UUID targetUserId = UUID.randomUUID();
+        UUID targetUserId = currentUserId;
 
         // FIX: Add PageRequest.of() and total elements
         Page<InterviewHistoryDto> emptyPage = new PageImpl<>(Collections.emptyList(), PageRequest.of(0, 10), 0);
@@ -253,66 +227,8 @@ public class UserProfileControllerTest {
         when(userProfileService.getUserInterviewHistory(eq(targetUserId), isNull(), isNull(), eq(0), eq(10)))
                 .thenReturn(emptyPage);
 
-        mockMvc.perform(get("/api/profile/{userId}/interviews", targetUserId))
+        mockMvc.perform(get("/api/profile/me/interviews"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isEmpty());
     }
-
-    // ==================== 4. Feedback Endpoints ====================
-
-    @Test
-    void getReceivedFeedback_ShouldReturnFeedbackList() throws Exception {
-        UUID targetUserId = UUID.randomUUID();
-        FeedbackDto feedback = new FeedbackDto(5, "Great job", UUID.randomUUID(), 1L, LocalDateTime.now());
-
-        // FIX: Add PageRequest.of() and total elements
-        Page<FeedbackDto> page = new PageImpl<>(List.of(feedback), PageRequest.of(0, 10), 1);
-
-        when(userProfileService.getUserReceivedFeedback(eq(targetUserId), isNull(), eq(0), eq(10))).thenReturn(page);
-
-        mockMvc.perform(get("/api/profile/{userId}/feedback", targetUserId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].rating").value(5))
-                .andExpect(jsonPath("$.content[0].comment").value("Great job"));
-    }
-
-    @Test
-    void getReceivedFeedback_ShouldReturnEmptyListIfNoFeedbackExists() throws Exception {
-        UUID targetUserId = UUID.randomUUID();
-
-        // FIX: Add PageRequest.of() and total elements
-        Page<FeedbackDto> emptyPage = new PageImpl<>(Collections.emptyList(), PageRequest.of(0, 10), 0);
-
-        when(userProfileService.getUserReceivedFeedback(eq(targetUserId), isNull(), eq(0), eq(10))).thenReturn(emptyPage);
-
-        mockMvc.perform(get("/api/profile/{userId}/feedback", targetUserId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content").isEmpty());
-    }
-
-    @Test
-    void getGivenFeedback_ShouldReturnFeedbackList() throws Exception {
-        UUID targetUserId = UUID.randomUUID();
-        FeedbackDto feedback = new FeedbackDto(4, "Good effort", UUID.randomUUID(), 2L, LocalDateTime.now());
-
-        // FIX: Add PageRequest.of() and total elements
-        Page<FeedbackDto> page = new PageImpl<>(List.of(feedback), PageRequest.of(0, 10), 1);
-
-        when(userProfileService.getUserGivenFeedback(eq(targetUserId), eq(0), eq(10))).thenReturn(page);
-
-        mockMvc.perform(get("/api/profile/{userId}/feedback/given", targetUserId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].rating").value(4));
-    }
-    @Test
-    void getReceivedFeedback_ShouldReturn404IfUserNotFound() throws Exception {
-        UUID targetUserId = UUID.randomUUID();
-        when(userProfileService.getUserReceivedFeedback(any(), any(), anyInt(), anyInt()))
-                .thenThrow(new UserNotFound("User not found"));
-
-        mockMvc.perform(get("/api/profile/{userId}/feedback", targetUserId))
-                .andExpect(status().isNotFound());
-    }
-
-
 }

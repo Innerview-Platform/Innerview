@@ -1,5 +1,7 @@
 package com.innerview.spring.controller;
 
+import com.innerview.spring.enums.EmploymentStatus;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +26,7 @@ import com.innerview.spring.service.UserService;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -31,6 +34,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AuthController.class)
+// JwtFilter is created by the web slice and needs RevokedUsers.
+@org.springframework.context.annotation.Import(com.innerview.spring.core.util.RevokedUsers.class)
 @AutoConfigureMockMvc(addFilters = false)
 public class AuthControllerTest {
 
@@ -95,10 +100,15 @@ public class AuthControllerTest {
 		id = UUID.randomUUID();
 		validRequest =
 				RegisterRequest.builder()
+						.username("john.doe")
 						.name("John Doe")
 						.email("test@example.com")
 						.password("Password123@")
 						.passwordConfirmation("Password123@")
+						.employmentStatus(EmploymentStatus.EMPLOYED)
+						.company("Acme")
+						.university("Cairo University")
+						.college("Faculty of Engineering")
 						.build();
 
 		successResponse =
@@ -142,6 +152,25 @@ public class AuthControllerTest {
 								.contentType(MediaType.APPLICATION_JSON)
 								.content(objectMapper.writeValueAsString(invalidRequest)))
 				.andExpect(status().isBadRequest()); // Expects 400 Status from Spring's @Valid
+	}
+
+	@Test
+	void registerUser_ShouldReturn400_WhenProfileFieldsAreMissing() throws Exception {
+		RegisterRequest withoutProfile =
+				RegisterRequest.builder()
+						.name("John Doe")
+						.email("test@example.com")
+						.password("Password123@")
+						.passwordConfirmation("Password123@")
+						.build();
+
+		mockMvc
+				.perform(
+						post("/api/auth/register")
+								.contentType(MediaType.APPLICATION_JSON)
+								.content(objectMapper.writeValueAsString(withoutProfile)))
+				.andExpect(status().isBadRequest());
+		verify(userService, never()).createUser(any(RegisterRequest.class));
 	}
 
 	@Test

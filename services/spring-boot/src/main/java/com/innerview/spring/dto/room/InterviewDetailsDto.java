@@ -30,5 +30,5 @@ public record InterviewDetailsDto(
     List<ChatMessageDto> chat,
     List<InviteDto> invites) {
 
-  public record Person(UUID userId, String name, String role) {}
+  public record Person(UUID userId, String name, String username, String avatarThumbUrl, String role) {}
 }

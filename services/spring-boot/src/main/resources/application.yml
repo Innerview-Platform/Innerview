@@ -1,4 +1,10 @@
 spring:
+  # Uploads (profile photo, resume) are limited to 5 MB in FileUploadService; allow a little
+  # multipart overhead here. nginx's client_max_body_size for /api/ must be at least as large.
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -75,6 +81,9 @@ notification:
 # Server configuration
 server:
   port: ${BACKEND_PORT:8080}
+  tomcat:
+    # Read (and discard) oversized uploads so the client gets a 413 response instead of a reset connection.
+    max-swallow-size: 10MB
   error:
     include-message: always
 

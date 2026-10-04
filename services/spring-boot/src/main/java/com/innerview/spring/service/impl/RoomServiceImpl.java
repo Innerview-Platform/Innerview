@@ -49,9 +49,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
+import com.innerview.spring.dto.stats.UserStatsChangedEvent;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -87,6 +90,8 @@ public class RoomServiceImpl implements RoomService {
   private final SfuService sfuService;
   private final CollaborationGateway collaboration;
   private final NotificationPublisherService notifications;
+  private final ApplicationEventPublisher events;
+  private final AvatarLookup avatars;
   private final String frontendUrl;
 
   public RoomServiceImpl(
@@ -102,6 +107,8 @@ public class RoomServiceImpl implements RoomService {
       SfuService sfuService,
       CollaborationGateway collaboration,
       NotificationPublisherService notifications,
+      ApplicationEventPublisher events,
+      AvatarLookup avatars,
       MeterRegistry meterRegistry,
       @Value("${frontend.url}") String frontendUrl) {
     this.interviewRepository = interviewRepository;
@@ -116,6 +123,8 @@ public class RoomServiceImpl implements RoomService {
     this.sfuService = sfuService;
     this.collaboration = collaboration;
     this.notifications = notifications;
+    this.events = events;
+    this.avatars = avatars;
     this.frontendUrl = frontendUrl;
 
     Gauge.builder("innerview.rooms.live", rooms, r -> r.values().stream().filter(ActiveRoom::isLive).count())
@@ -243,6 +252,8 @@ public class RoomServiceImpl implements RoomService {
                     RoomParticipant p = new RoomParticipant();
                     p.setUserId(id);
                     p.setName(user.getName());
+                    p.setUsername(user.getUsername());
+                    p.setAvatarThumbUrl(avatars.thumbnail(id));
                     p.setRole(role);
                     p.setJoinedAt(Instant.now());
                     return p;
@@ -548,6 +559,12 @@ public class RoomServiceImpl implements RoomService {
       interview.setEndTime(Instant.now());
     }
     interviewRepository.save(interview);
+    if (interview.getStatus() == InterviewStatus.COMPLETED) {
+      // Participants' "total interviews" on their profiles.
+      events.publishEvent(new UserStatsChangedEvent(userInterviewRepository.findByIdInterviewId(interview.getId()).stream()
+          .map(participation -> participation.getId().getUserId())
+          .collect(Collectors.toSet())));
+    }
 
     if (room != null) {
       room.getParticipants().values().forEach(p -> p.getSessions().keySet().forEach(sessions::remove));
@@ -861,6 +878,8 @@ public class RoomServiceImpl implements RoomService {
             .map(p -> new ParticipantDto(
                 p.getUserId(),
                 p.getName(),
+                p.getUsername(),
+                p.getAvatarThumbUrl(),
                 p.getRole().name(),
                 p.getStatus().name(),
                 p.getUserId().equals(room.getHostId()),

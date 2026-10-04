@@ -34,4 +34,32 @@ public interface UserInterviewRepository extends JpaRepository<UserInterview, Us
             @Param("type") InterviewType type,
             Pageable pageable
     );
+
+
+    /**
+     * True when {@code viewerId} interviews (or observes) {@code candidateId} in this interview and it
+     * is live right now — the only time someone other than the owner may read a resume.
+     */
+    @Query("""
+        SELECT COUNT(viewer) > 0 FROM UserInterview viewer, UserInterview candidate
+        WHERE viewer.interview.id = :interviewId AND candidate.interview.id = :interviewId
+        AND viewer.user.id = :viewerId AND candidate.user.id = :candidateId
+        AND viewer.role IN (com.innerview.spring.enums.InterviewRole.INTERVIEWER,
+                            com.innerview.spring.enums.InterviewRole.BOTH,
+                            com.innerview.spring.enums.InterviewRole.OBSERVER)
+        AND candidate.role IN (com.innerview.spring.enums.InterviewRole.INTERVIEWEE,
+                               com.innerview.spring.enums.InterviewRole.BOTH)
+        AND viewer.interview.status = com.innerview.spring.enums.InterviewStatus.STARTED
+    """)
+    boolean canViewResumeDuringInterview(
+            @Param("interviewId") Long interviewId,
+            @Param("viewerId") UUID viewerId,
+            @Param("candidateId") UUID candidateId);
+
+    /** True while the user is in an interview that is running. */
+    @Query("""
+        SELECT COUNT(ui) > 0 FROM UserInterview ui
+        WHERE ui.user.id = :userId AND ui.interview.status = com.innerview.spring.enums.InterviewStatus.STARTED
+    """)
+    boolean isInLiveInterview(@Param("userId") UUID userId);
 }
