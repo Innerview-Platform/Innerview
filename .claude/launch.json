@@ -3,9 +3,11 @@
   "configurations": [
     {
       "name": "innerview-web",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
-      "port": 3000
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "frontend", "dev"],
+      "port": 5174,
+      "autoPort": true,
+      "env": { "VITE_LIVEKIT_URL": "ws://localhost:7880" }
     }
   ]
 }

@@ -78,18 +78,18 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         accessToken = tokenService.createAccessToken(savedUser);
       }
     }
-    Cookie accessTokenCookie = new Cookie("access_token", accessToken);
-    accessTokenCookie.setHttpOnly(true);
-    accessTokenCookie.setPath("/");
-    accessTokenCookie.setMaxAge(accessTokenExpiry / 1000);
-
-    Cookie refreshTokenCookie = new Cookie("refresh_token", refreshToken);
-    refreshTokenCookie.setHttpOnly(true);
-    refreshTokenCookie.setPath("/");
-    refreshTokenCookie.setMaxAge(refreshTokenExpiry / 1000);
-    response.addCookie(accessTokenCookie);
-    response.addCookie(refreshTokenCookie);
-    // we should change that to frontend url/homepage or similar
-    response.sendRedirect(frontendUrl + "/dashboard");
+    // The SPA can't read httpOnly cookies, so only the refresh token is set; the app exchanges it
+    // for an access token via POST /api/auth/refresh as soon as it loads (?signin=google).
+    response.addHeader(
+        "Set-Cookie",
+        org.springframework.http.ResponseCookie.from("refresh_token", refreshToken)
+            .httpOnly(true)
+            .secure(frontendUrl.startsWith("https://"))
+            .path("/api/auth")
+            .maxAge(refreshTokenExpiry / 1000)
+            .sameSite("Lax")
+            .build()
+            .toString());
+    response.sendRedirect(frontendUrl + "/?signin=google");
   }
 }

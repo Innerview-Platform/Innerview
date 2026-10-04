@@ -37,7 +37,7 @@ public class JwtFilter extends OncePerRequestFilter {
 		try {
 			String jwt = extractJwtFromHeader(request);
 
-			if (jwt != null && jwtUtil.validateToken(jwt)) {
+			if (jwt != null && jwtUtil.validateAccessToken(jwt)) {
 				//extract the ID directly from the token payload
 				UUID currentUserId = jwtUtil.extractUserId(jwt);
 
