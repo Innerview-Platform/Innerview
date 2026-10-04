@@ -5,6 +5,7 @@ import com.innerview.spring.dto.InstantInterviewRequest;
 import com.innerview.spring.dto.InterviewResponse;
 import com.innerview.spring.dto.InterviewScheduledNotification;
 import com.innerview.spring.dto.InterviewSummaryDto;
+import com.innerview.spring.dto.NotificationRequestedEvent;
 import com.innerview.spring.dto.ScheduledInterviewRequest;
 import com.innerview.spring.dto.room.ChatMessageDto;
 import com.innerview.spring.dto.room.InterviewDetailsDto;
@@ -33,7 +34,6 @@ import com.innerview.spring.repository.ProblemRepository;
 import com.innerview.spring.repository.UserInterviewRepository;
 import com.innerview.spring.repository.UserRepository;
 import com.innerview.spring.service.InterviewService;
-import com.innerview.spring.service.NotificationPublisherService;
 import com.innerview.spring.service.RoomService;
 import java.time.Duration;
 import java.time.Instant;
@@ -52,7 +52,9 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -65,7 +67,7 @@ public class InterviewServiceImpl implements InterviewService {
 
   private final InterviewRepository interviewRepository;
   private final InterviewMapper interviewMapper;
-  private final NotificationPublisherService notificationPublisherService;
+  private final ApplicationEventPublisher events;
   private final ProblemRepository problemRepository;
   private final UserRepository userRepository;
   private final UserInterviewRepository userInterviewRepository;
@@ -73,6 +75,7 @@ public class InterviewServiceImpl implements InterviewService {
   private final InterviewMessageRepository messageRepository;
   private final AvatarLookup avatarLookup;
   private final InviteService inviteService;
+  private final InterviewCancellationNotifier cancellationNotifier;
   private final RoomService roomService;
 
   @Value("${frontend.url}")
@@ -81,14 +84,9 @@ public class InterviewServiceImpl implements InterviewService {
   @Value("${interview.duration}")
   private Integer interviewDuration;
 
+  /** One transaction with its invites; notifications go out only after it commits. */
   @Override
-  public List<InterviewSummaryDto> getInterviewHistory(UUID userId) {
-    return interviewRepository.findCompletedInterviewsByUserIdNative(userId).stream()
-        .map(interviewMapper::toSummaryDto)
-        .collect(Collectors.toList());
-  }
-
-  @Override
+  @Transactional
   public InterviewResponse createInstantInterview(InstantInterviewRequest request, UUID userId) {
     Interview interview =
         newInterview(
@@ -106,6 +104,7 @@ public class InterviewServiceImpl implements InterviewService {
   }
 
   @Override
+  @Transactional
   public InterviewResponse createScheduledInterview(ScheduledInterviewRequest request, UUID userId) {
     if (request.getStartTime() == null || request.getStartTime().isBefore(Instant.now().minus(Duration.ofMinutes(1)))) {
       throw ApiException.badRequest("INVALID_START", "Choose a start time in the future");
@@ -173,27 +172,25 @@ public class InterviewServiceImpl implements InterviewService {
     Optional<User> owner = userRepository.findById(interview.getOwnerId());
     if (owner.isEmpty()) return;
     User user = owner.get();
-    try {
-      notificationPublisherService.dispatch(
-          new InterviewScheduledNotification(
-              user.getId().toString(),
-              user.getEmail(),
-              user.getName(),
-              interview.getType(),
-              roomSize,
-              interview.getStartTime(),
-              interview.getDurationMinutes(),
-              roomLink(interview)),
-          NotificationType.INTERVIEW_SCHEDULED,
-          interview.getId(),
-          interview.getStartTime(),
-          interview.getEndTime(),
-          interview.getDurationMinutes(),
-          user.getName(),
-          user.getEmail());
-    } catch (Exception e) {
-      log.warn("Could not send the schedule notification for interview {}: {}", interview.getId(), e.getMessage());
-    }
+    // Sent after commit (AfterCommitNotificationSender), so a rolled-back request emails nobody.
+    events.publishEvent(
+        new NotificationRequestedEvent(
+            new InterviewScheduledNotification(
+                user.getId().toString(),
+                user.getEmail(),
+                user.getName(),
+                interview.getType(),
+                roomSize,
+                interview.getStartTime(),
+                interview.getDurationMinutes(),
+                roomLink(interview)),
+            NotificationType.INTERVIEW_SCHEDULED,
+            interview.getId(),
+            interview.getStartTime(),
+            interview.getEndTime(),
+            interview.getDurationMinutes(),
+            user.getName(),
+            user.getEmail()));
   }
 
   private List<Problem> resolveProblems(List<UUID> problemIds) {
@@ -209,14 +206,19 @@ public class InterviewServiceImpl implements InterviewService {
   }
 
   @Override
+  @Transactional
   public void cancelInterview(Long interviewId, UUID currentUserId) {
     Interview interview = interview(interviewId);
     if (!interview.getOwnerId().equals(currentUserId)) throw ApiException.forbidden("NOT_OWNER", "Only the owner can cancel this interview");
     if (interview.getStatus() != InterviewStatus.SCHEDULED || interview.getLiveSince() != null) {
       throw ApiException.conflict("NOT_CANCELLABLE", "Only interviews that haven't started can be cancelled");
     }
+    // The check above is for a clear error; this one decides, in case someone joined since.
+    if (interviewRepository.endIfNeverStarted(interviewId, InterviewStatus.CANCELLED) == 0) {
+      throw ApiException.conflict("NOT_CANCELLABLE", "Someone just joined, so the interview has started");
+    }
     interview.setStatus(InterviewStatus.CANCELLED);
-    interviewRepository.save(interview);
+    cancellationNotifier.notifyCancelled(interview, currentUserId);
   }
 
   @Override
@@ -328,7 +330,9 @@ public class InterviewServiceImpl implements InterviewService {
     Instant start = details.startTime() == null ? Instant.now() : details.startTime();
     Instant end = details.endTime() == null ? start.plus(Duration.ofMinutes(60)) : details.endTime();
     String link = frontendUrl + "/" + details.displayCode();
-    String summary = details.title() == null ? "Mock interview (InnerView)" : details.title() + " (InnerView)";
+    boolean cancelled = InterviewStatus.CANCELLED.name().equals(details.status());
+    String summary = (cancelled ? "Cancelled: " : "")
+        + (details.title() == null ? "Mock interview (InnerView)" : details.title() + " (InnerView)");
     return String.join(
         "\r\n",
         "BEGIN:VCALENDAR",
@@ -340,6 +344,9 @@ public class InterviewServiceImpl implements InterviewService {
         "DTSTAMP:" + ICS_TIME.format(Instant.now()),
         "DTSTART:" + ICS_TIME.format(start),
         "DTEND:" + ICS_TIME.format(end),
+        // Same UID with a higher SEQUENCE lets calendar apps update an event imported earlier.
+        "STATUS:" + (cancelled ? "CANCELLED" : "CONFIRMED"),
+        "SEQUENCE:" + (cancelled ? 1 : 0),
         "SUMMARY:" + escapeIcs(summary),
         "DESCRIPTION:" + escapeIcs("Join: " + link),
         "URL:" + link,

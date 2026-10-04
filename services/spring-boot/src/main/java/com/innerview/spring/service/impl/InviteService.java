@@ -3,6 +3,7 @@ package com.innerview.spring.service.impl;
 import com.innerview.spring.core.util.RoomUtil;
 import com.innerview.spring.dto.InterviewInviteEmailNotification;
 import com.innerview.spring.dto.InterviewInviteNotification;
+import com.innerview.spring.dto.NotificationRequestedEvent;
 import com.innerview.spring.dto.room.InviteDto;
 import com.innerview.spring.dto.room.InviteRequest;
 import com.innerview.spring.entity.Interview;
@@ -16,7 +17,6 @@ import com.innerview.spring.exception.ApiException;
 import com.innerview.spring.repository.InterviewInviteRepository;
 import com.innerview.spring.repository.InterviewRepository;
 import com.innerview.spring.repository.UserRepository;
-import com.innerview.spring.service.NotificationPublisherService;
 import com.innerview.spring.service.RoomService;
 import java.time.Duration;
 import java.time.Instant;
@@ -29,7 +29,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Invitations by email. Invitees join the room directly (no lobby), get an email with the link
@@ -45,19 +48,21 @@ public class InviteService {
   private final InterviewInviteRepository inviteRepository;
   private final InterviewRepository interviewRepository;
   private final UserRepository userRepository;
-  private final NotificationPublisherService notifications;
+  private final ApplicationEventPublisher events;
   private final ObjectProvider<RoomService> roomService; // lazy: RoomService doesn't depend on invites
 
   @Value("${frontend.url}")
   private String frontendUrl;
 
+  /** All or nothing: one bad invitee rolls back the whole list, and no emails go out. */
+  @Transactional
   public List<InviteDto> invite(Long interviewId, List<InviteRequest.Invitee> invitees, UUID actorId) {
     Interview interview = interview(interviewId);
     requireCanInvite(interview, actorId);
     return invite(interview, invitees, actorId);
   }
 
-  /** Also used while creating an interview (the creator is the actor). */
+  /** Also used while creating an interview (the creator is the actor), inside its transaction. */
   public List<InviteDto> invite(Interview interview, List<InviteRequest.Invitee> invitees, UUID actorId) {
     if (invitees == null || invitees.isEmpty()) return List.of();
     if (interview.getStatus() == InterviewStatus.COMPLETED
@@ -76,7 +81,9 @@ public class InviteService {
       InterviewRole role = parseRole(invitee.role());
 
       Optional<InterviewInvite> current = inviteRepository.findByInterviewIdAndEmailIgnoreCase(interview.getId(), email);
-      if (current.isEmpty() && ++existing > MAX_INVITES_PER_INTERVIEW) {
+      // Revoked invites aren't in `existing`, so bringing one back counts like a new one.
+      boolean adds = current.isEmpty() || current.get().getStatus() == InviteStatus.REVOKED;
+      if (adds && ++existing > MAX_INVITES_PER_INTERVIEW) {
         throw ApiException.badRequest("TOO_MANY_INVITES", "An interview can have at most " + MAX_INVITES_PER_INTERVIEW + " invitees");
       }
       InterviewInvite invite = current.orElseGet(InterviewInvite::new);
@@ -90,7 +97,14 @@ public class InviteService {
       }
       Optional<User> account = userRepository.findByEmail(email);
       account.ifPresent(user -> invite.setUserId(user.getId()));
-      InterviewInvite saved = inviteRepository.save(invite);
+      InterviewInvite saved;
+      try {
+        saved = inviteRepository.save(invite);
+      } catch (DataIntegrityViolationException e) {
+        // Another request invited the same email between our lookup and this insert (unique
+        // interview_id + email). The transaction is rolled back, so nothing from this request stays.
+        throw ApiException.conflict("ALREADY_INVITED", email + " was just invited by someone else. Refresh and try again.");
+      }
       result.add(dto(saved));
       if (resend) sendInvite(interview, saved, inviter, account.orElse(null));
     }
@@ -111,6 +125,10 @@ public class InviteService {
         .orElseThrow(() -> ApiException.notFound("Invite not found"));
     invite.setStatus(InviteStatus.REVOKED);
     inviteRepository.save(invite);
+    // A revoked invite alone doesn't remove someone who already joined (or let them back in).
+    Optional.ofNullable(invite.getUserId())
+        .or(() -> userRepository.findByEmail(invite.getEmail()).map(User::getId))
+        .ifPresent(userId -> roomService.getObject().removeRevokedInvitee(interview.getRoomId(), actorId, userId));
   }
 
   /** The owner, or the host/an interviewer while the interview is live. */
@@ -134,11 +152,8 @@ public class InviteService {
         account == null
             ? new InterviewInviteEmailNotification(null, invite.getEmail(), inviter.getName(), interview.getTitle(), interview.getType(), invite.getRole().name(), start, start.plus(Duration.ofMinutes(minutes)), link)
             : new InterviewInviteNotification(account.getId(), invite.getEmail(), inviter.getName(), interview.getTitle(), interview.getType(), invite.getRole().name(), start, start.plus(Duration.ofMinutes(minutes)), link);
-    try {
-      notifications.dispatch(notification, NotificationType.INTERVIEW_INVITE);
-    } catch (Exception e) {
-      log.warn("[Invite] Could not send the invite to {}: {}", invite.getEmail(), e.getMessage());
-    }
+    // Sent after commit (AfterCommitNotificationSender), so a rolled-back request emails nobody.
+    events.publishEvent(new NotificationRequestedEvent(notification, NotificationType.INTERVIEW_INVITE));
   }
 
   static InterviewRole parseRole(String role) {

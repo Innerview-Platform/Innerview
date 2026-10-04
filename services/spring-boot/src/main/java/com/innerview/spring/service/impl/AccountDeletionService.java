@@ -44,6 +44,7 @@ public class AccountDeletionService {
   private final UserStatsRepository stats;
   private final UserInterviewRepository userInterviews;
   private final InterviewRepository interviews;
+  private final InterviewCancellationNotifier cancellationNotifier;
   private final PasswordEncoder passwordEncoder;
   private final RevokedUsers revokedUsers;
 
@@ -59,7 +60,11 @@ public class AccountDeletionService {
 
     // Interviews this user scheduled can't happen without them.
     for (Interview interview : interviews.findByOwnerIdOrderByCreatedAtDesc(userId)) {
-      if (interview.getStatus() == InterviewStatus.SCHEDULED) interview.setStatus(InterviewStatus.CANCELLED);
+      // Conditional, so an interview someone is joining right now isn't cancelled under them.
+      if (interview.getStatus() == InterviewStatus.SCHEDULED
+          && interviews.endIfNeverStarted(interview.getId(), InterviewStatus.CANCELLED) == 1) {
+        cancellationNotifier.notifyCancelled(interview, userId); // sent after this transaction commits
+      }
     }
 
     profiles.getUserProfileByUser_Id(userId).ifPresent(profiles::delete);

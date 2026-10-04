@@ -59,6 +59,12 @@ public interface RoomService {
   /** Host/interviewers: removes someone; they can't rejoin. */
   void removeParticipant(String code, UUID actorId, UUID targetId);
 
+  /**
+   * Someone's invite was revoked (the caller checked permission): while the room is live they're
+   * blocked from it, and removed if they're inside. Nothing to do when it isn't live.
+   */
+  void removeRevokedInvitee(String code, UUID actorId, UUID targetId);
+
   /** Host: sets someone's role (INTERVIEWER = co-host, INTERVIEWEE, OBSERVER). */
   void changeRole(String code, UUID actorId, UUID targetId, InterviewRole role);
 

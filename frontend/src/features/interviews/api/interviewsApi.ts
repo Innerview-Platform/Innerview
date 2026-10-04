@@ -19,7 +19,7 @@ import type {
 export const interviewsApi = {
   /**
    * GET /api/profile/me/interviews — the signed-in user's history, newest first. `userId` only scopes
-   * the cache key. (GET /api/interviews/user/{userId}/history is a stub that returns a plain string.)
+   * the cache key.
    */
   async getHistory(_userId: string, { status, type, page, limit }: InterviewHistoryFilters & PageParams) {
     const { data } = await apiClient.get<SpringPage<InterviewHistoryItem>>('/api/profile/me/interviews', {

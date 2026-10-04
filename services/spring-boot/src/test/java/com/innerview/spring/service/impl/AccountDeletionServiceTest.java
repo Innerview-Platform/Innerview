@@ -31,7 +31,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 /** Runs the deletion against the test database. */
 @DataJpaTest
-@Import({AccountDeletionService.class, RevokedUsers.class, PasswordEncoderConfig.class})
+@Import({AccountDeletionService.class, InterviewCancellationNotifier.class, RevokedUsers.class, PasswordEncoderConfig.class})
 class AccountDeletionServiceTest {
   @Autowired AccountDeletionService service;
   @Autowired RevokedUsers revokedUsers;

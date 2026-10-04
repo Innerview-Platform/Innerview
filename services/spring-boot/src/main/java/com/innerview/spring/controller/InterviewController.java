@@ -36,11 +36,6 @@ public class InterviewController {
   private final FeedbackService feedbackService;
   private final RoomService roomService;
 
-  @GetMapping("/user/{userId}/history")
-  public ResponseEntity<List<InterviewSummaryDto>> getUserInterviewHistory(@PathVariable UUID userId) {
-    return ResponseEntity.ok(interviewService.getInterviewHistory(userId));
-  }
-
   @GetMapping("/user/createdInterviews")
   public ResponseEntity<List<InterviewSummaryDto>> getUserCreatedInterviews(@AuthenticationPrincipal UUID currentUserId) {
     return ResponseEntity.ok(interviewService.getCreatedInterview(currentUserId));
@@ -54,13 +49,13 @@ public class InterviewController {
 
   @PostMapping("/instant")
   public ResponseEntity<InterviewResponse> createInstantInterview(
-      @RequestBody InstantInterviewRequest request, @AuthenticationPrincipal UUID currentUserId) {
+      @Valid @RequestBody InstantInterviewRequest request, @AuthenticationPrincipal UUID currentUserId) {
     return ResponseEntity.ok(interviewService.createInstantInterview(request, currentUserId));
   }
 
   @PostMapping("/scheduled")
   public ResponseEntity<InterviewResponse> createScheduledInterview(
-      @RequestBody ScheduledInterviewRequest request, @AuthenticationPrincipal UUID currentUserId) {
+      @Valid @RequestBody ScheduledInterviewRequest request, @AuthenticationPrincipal UUID currentUserId) {
     return ResponseEntity.ok(interviewService.createScheduledInterview(request, currentUserId));
   }
 

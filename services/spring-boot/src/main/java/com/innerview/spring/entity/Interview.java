@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * Set of interviews associated with this user. *
@@ -26,6 +27,9 @@ import org.hibernate.annotations.CreationTimestamp;
 @Entity
 @Table(name = "interviews")
 @Data
+// Updates write only the changed columns, so saving one field from a stale copy (e.g. a document
+// save) can't overwrite a status another request just changed.
+@DynamicUpdate
 public class Interview {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.UUID;
 
 public interface InterviewService {
-  List<InterviewSummaryDto> getInterviewHistory(UUID userId);
 
   InterviewResponse createInstantInterview(InstantInterviewRequest request, UUID currentUserId);
 

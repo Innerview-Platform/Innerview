@@ -17,7 +17,7 @@ export const createInterviewSchema = z
         email: z.union([z.literal(''), z.email('Enter a valid email')]),
         role: z.enum(['INTERVIEWER', 'INTERVIEWEE', 'OBSERVER']),
       }),
-    ),
+    ).max(20, 'You can invite at most 20 people at once'),
     /** `datetime-local` value, interpreted in the browser's time zone. */
     startTime: z.string(),
   })

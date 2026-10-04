@@ -92,6 +92,7 @@ public class RoomServiceImpl implements RoomService {
   private final NotificationPublisherService notifications;
   private final ApplicationEventPublisher events;
   private final AvatarLookup avatars;
+  private final InterviewCancellationNotifier cancellationNotifier;
   private final String frontendUrl;
 
   public RoomServiceImpl(
@@ -109,6 +110,7 @@ public class RoomServiceImpl implements RoomService {
       NotificationPublisherService notifications,
       ApplicationEventPublisher events,
       AvatarLookup avatars,
+      InterviewCancellationNotifier cancellationNotifier,
       MeterRegistry meterRegistry,
       @Value("${frontend.url}") String frontendUrl) {
     this.interviewRepository = interviewRepository;
@@ -125,6 +127,7 @@ public class RoomServiceImpl implements RoomService {
     this.notifications = notifications;
     this.events = events;
     this.avatars = avatars;
+    this.cancellationNotifier = cancellationNotifier;
     this.frontendUrl = frontendUrl;
 
     Gauge.builder("innerview.rooms.live", rooms, r -> r.values().stream().filter(ActiveRoom::isLive).count())
@@ -170,7 +173,8 @@ public class RoomServiceImpl implements RoomService {
       access = "ENDED";
     } else if (room != null && room.getBlocked().contains(userId)) {
       access = "REMOVED";
-    } else if (!isOwner && joinOpensAt != null && Instant.now().isBefore(joinOpensAt)) {
+    } else if (joinOpensAt != null && Instant.now().isBefore(joinOpensAt)) {
+      // The host too: entering makes the interview live, and an early visit would then end it as EMPTY.
       access = "NOT_STARTED";
     } else {
       if (isOwner) {
@@ -413,23 +417,38 @@ public class RoomServiceImpl implements RoomService {
     requireStaff(room, actorId);
     if (targetId.equals(room.getOwnerId())) throw ApiException.forbidden("CANNOT_REMOVE_OWNER", "The interview's creator can't be removed");
     if (targetId.equals(actorId)) throw ApiException.badRequest("CANNOT_REMOVE_SELF", "Use Leave instead");
-    RoomParticipant p = room.getParticipants().get(targetId);
-    if (p == null) throw ApiException.notFound("That person isn't in this interview");
+    if (room.getParticipants().get(targetId) == null) throw ApiException.notFound("That person isn't in this interview");
+    block(room, actorId, targetId);
+    log.info("[Room {}] {} removed {}", room.getCode(), actorId, targetId);
+  }
+
+  @Override
+  public void removeRevokedInvitee(String rawCode, UUID actorId, UUID targetId) {
+    ActiveRoom room = rooms.get(RoomUtil.canonical(rawCode));
+    if (room == null || !room.isLive() || targetId.equals(room.getOwnerId())) return;
+    block(room, actorId, targetId);
+    log.info("[Room {}] {} revoked the invite of {}", room.getCode(), actorId, targetId);
+  }
+
+  /** Keeps {@code targetId} out of the room, and disconnects them everywhere if they're inside. */
+  private void block(ActiveRoom room, UUID actorId, UUID targetId) {
+    RoomParticipant p;
     synchronized (room) {
       room.getBlocked().add(targetId);
-      p.setStatus(RoomParticipantStatus.LEFT);
-      p.getSessions().keySet().forEach(sessions::remove);
-      p.getSessions().clear();
       room.getRequests().values().stream()
           .filter(r -> r.getUserId().equals(targetId) && r.getStatus() == AccessRequest.Status.PENDING)
           .forEach(r -> r.setStatus(AccessRequest.Status.DENIED));
+      p = room.getParticipants().get(targetId);
+      if (p == null) return; // not inside: blocking is enough
+      p.setStatus(RoomParticipantStatus.LEFT);
+      p.getSessions().keySet().forEach(sessions::remove);
+      p.getSessions().clear();
       handOffHostIfNeeded(room);
     }
     toUser(targetId, "/queue/session", Map.of("type", "REMOVED", "room", room.getCode(), "by", nameOf(room, actorId)));
     collaboration.revokeUser(room.getCode(), targetId, null, true);
     sfuService.removeParticipant(room.getCode(), targetId);
     broadcastState(room);
-    log.info("[Room {}] {} removed {}", room.getCode(), actorId, targetId);
   }
 
   @Override
@@ -552,13 +571,21 @@ public class RoomServiceImpl implements RoomService {
     }
 
     if (!wasLive) {
-      // Never entered: an explicit end is a cancellation, otherwise nobody showed up.
-      interview.setStatus(reason == InterviewEndReason.ENDED_BY_HOST ? InterviewStatus.CANCELLED : InterviewStatus.GHOSTED);
+      // Never entered: an explicit end is a cancellation, otherwise nobody showed up. Conditional,
+      // so a no-show sweep can't overwrite a cancel (or the reverse) and nobody is notified twice.
+      InterviewStatus status = reason == InterviewEndReason.ENDED_BY_HOST ? InterviewStatus.CANCELLED : InterviewStatus.GHOSTED;
+      if (interviewRepository.endIfNeverStarted(interview.getId(), status) == 1) {
+        interview.setStatus(status);
+        // Only the owner can end a room nobody entered, and the owner has no invite to skip.
+        if (status == InterviewStatus.CANCELLED) cancellationNotifier.notifyCancelled(interview, interview.getOwnerId());
+      } else {
+        log.info("[Room {}] Interview {} was already ended or started; leaving it as is", code, interview.getId());
+      }
     } else {
       interview.setStatus(InterviewStatus.COMPLETED);
       interview.setEndTime(Instant.now());
+      interviewRepository.save(interview);
     }
-    interviewRepository.save(interview);
     if (interview.getStatus() == InterviewStatus.COMPLETED) {
       // Participants' "total interviews" on their profiles.
       events.publishEvent(new UserStatsChangedEvent(userInterviewRepository.findByIdInterviewId(interview.getId()).stream()
@@ -728,18 +755,31 @@ public class RoomServiceImpl implements RoomService {
     });
   }
 
-  /** First entry: the interview is now in progress and its clock starts. */
+  /**
+   * First entry: the interview is now in progress and its clock starts. The access check that let
+   * the caller in may be stale (a cancel can commit in between), so the update itself re-checks.
+   */
   private void goLive(ActiveRoom room, Interview interview) {
     Instant now = Instant.now();
-    if (interview.getLiveSince() == null) {
-      interview.setLiveSince(now);
+    Instant liveSince = interview.getLiveSince();
+    Instant endTime = interview.getEndTime();
+    if (liveSince == null) {
+      liveSince = now;
       int minutes = interview.getDurationMinutes() == null ? 60 : interview.getDurationMinutes();
       Instant start = interview.getStartTime() == null || interview.getStartTime().isBefore(now) ? now : interview.getStartTime();
-      interview.setEndTime(start.plus(Duration.ofMinutes(minutes)));
+      endTime = start.plus(Duration.ofMinutes(minutes));
     }
+    if (interviewRepository.markLiveIfNotEnded(interview.getId(), liveSince, endTime) == 0) {
+      rooms.remove(room.getCode(), room);
+      boolean cancelled = interviewRepository.findById(interview.getId())
+          .map(i -> i.getStatus() == InterviewStatus.CANCELLED)
+          .orElse(false);
+      throw accessError(cancelled ? "CANCELLED" : "ENDED");
+    }
+    interview.setLiveSince(liveSince);
+    interview.setEndTime(endTime);
     interview.setStatus(InterviewStatus.STARTED);
-    interviewRepository.save(interview);
-    room.setEndsAt(interview.getEndTime());
+    room.setEndsAt(endTime);
     room.setLive(true);
   }
 
