@@ -9,11 +9,7 @@ export type InterviewRole = (typeof INTERVIEW_ROLES)[number]
 export const INTERVIEW_TYPES = ['PROBLEM_SOLVING', 'SYSTEM_DESIGN', 'HR', 'TECHNICAL'] as const
 export type InterviewType = (typeof INTERVIEW_TYPES)[number]
 
-/** RoomSize — ONE_ON_ONE rooms hold 2 participants, MANY rooms are unlimited. */
-export const ROOM_SIZES = ['ONE_ON_ONE', 'MANY'] as const
-export type RoomSize = (typeof ROOM_SIZES)[number]
-
-export const INTERVIEW_STATUSES = ['SCHEDULED', 'STARTED', 'COMPLETED', 'CANCELLED', 'GHOSTED'] as const
+export const INTERVIEW_STATUSES = ['SCHEDULED', 'STARTED', 'COMPLETED', 'CANCELLED'] as const
 export type InterviewStatus = (typeof INTERVIEW_STATUSES)[number]
 
 export const EXPERIENCE_LEVEL_LABELS: Record<ExperienceLevel, string> = {
@@ -49,7 +45,6 @@ export const INTERVIEW_STATUS_LABELS: Record<InterviewStatus, string> = {
   STARTED: 'In progress',
   COMPLETED: 'Completed',
   CANCELLED: 'Cancelled',
-  GHOSTED: 'No-show',
 }
 
 /** Look up a label for a value the backend sent as a plain string, falling back to the raw value. */

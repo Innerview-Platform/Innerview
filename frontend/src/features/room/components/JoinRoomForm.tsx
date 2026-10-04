@@ -3,8 +3,16 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/common/Button'
 import { TextInput } from '@/components/forms/controls'
-import { parseCodeInput } from '@/features/room/utils/roomCode'
 import { paths } from '@/routes/paths'
+
+// Room ids are 6 alphanumeric characters (RoomUtil). Pasting a full invite link also works.
+const ROOM_ID_PATTERN = /^[A-Za-z0-9]{6}$/
+
+function extractRoomId(input: string): string {
+  const trimmed = input.trim()
+  const fromLink = trimmed.match(/\/room\/join\/([A-Za-z0-9]+)/)
+  return fromLink?.[1] ?? trimmed
+}
 
 export function JoinRoomForm({ autoFocus = false }: { autoFocus?: boolean }) {
   const navigate = useNavigate()
@@ -13,13 +21,12 @@ export function JoinRoomForm({ autoFocus = false }: { autoFocus?: boolean }) {
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
-    // Accepts "abc-defg-hij" in any case, with or without dashes, or a pasted invite link.
-    const code = parseCodeInput(value)
-    if (!code) {
-      setError('Enter the interview code (like abc-defg-hij) or paste the invite link.')
+    const roomId = extractRoomId(value)
+    if (!ROOM_ID_PATTERN.test(roomId)) {
+      setError('Enter the 6-character room code or paste the invite link.')
       return
     }
-    navigate(paths.room(code))
+    navigate(paths.room(roomId))
   }
 
   return (
@@ -35,7 +42,7 @@ export function JoinRoomForm({ autoFocus = false }: { autoFocus?: boolean }) {
             setValue(e.target.value)
             setError(null)
           }}
-          placeholder="e.g. abc-defg-hij"
+          placeholder="e.g. 3AfpbH"
           autoComplete="off"
           spellCheck={false}
           autoFocus={autoFocus}

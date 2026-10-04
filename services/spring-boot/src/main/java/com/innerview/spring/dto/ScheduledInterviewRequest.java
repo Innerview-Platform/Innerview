@@ -16,7 +16,4 @@ public class ScheduledInterviewRequest {
   @NotNull InterviewRole creatorInterviewRole;
   @NotNull Instant startTime;
   List<UUID> problemIds;
-  String title;
-  com.innerview.spring.enums.AccessPolicy accessPolicy;
-  java.util.List<com.innerview.spring.dto.room.InviteRequest.Invitee> invitees;
 }

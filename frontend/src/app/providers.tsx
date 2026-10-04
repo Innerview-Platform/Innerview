@@ -3,7 +3,6 @@ import { Provider as ReduxProvider } from 'react-redux'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { store } from '@/app/store'
-import { AuthBootstrap } from '@/features/auth/components/AuthBootstrap'
 import { SessionWatcher } from '@/features/auth/components/SessionWatcher'
 import { queryClient } from '@/lib/queryClient'
 
@@ -12,7 +11,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
     <ReduxProvider store={store}>
       <QueryClientProvider client={queryClient}>
         <SessionWatcher />
-        <AuthBootstrap>{children}</AuthBootstrap>
+        {children}
         <Toaster
           theme="dark"
           position="bottom-right"

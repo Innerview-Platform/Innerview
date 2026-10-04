@@ -1,9 +1,8 @@
 import { lazy, Suspense } from 'react'
-import { createBrowserRouter, Navigate, useParams } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AuthLayout } from '@/components/layout/AuthLayout'
 import { PageLoader } from '@/components/feedback/states'
-import { looksLikeRoomCode } from '@/features/room/utils/roomCode'
 import NotFoundPage from '@/pages/NotFoundPage'
 import RouteErrorPage from '@/pages/RouteErrorPage'
 import { GuestRoute, ProtectedRoute } from '@/routes/guards'
@@ -16,34 +15,17 @@ const ResetPasswordPage = lazy(() => import('@/features/auth/pages/ResetPassword
 const DashboardPage = lazy(() => import('@/features/dashboard/pages/DashboardPage'))
 const InterviewsPage = lazy(() => import('@/features/interviews/pages/InterviewsPage'))
 const NewInterviewPage = lazy(() => import('@/features/interviews/pages/NewInterviewPage'))
-const InterviewDetailsPage = lazy(() => import('@/features/interviews/pages/InterviewDetailsPage'))
-const InterviewFeedbackPage = lazy(() => import('@/features/feedback/pages/InterviewFeedbackPage'))
 const FeedbackPage = lazy(() => import('@/features/feedback/pages/FeedbackPage'))
 const ProfilePage = lazy(() => import('@/features/profile/pages/ProfilePage'))
 const JoinRoomPage = lazy(() => import('@/features/room/pages/JoinRoomPage'))
 const RoomPage = lazy(() => import('@/features/room/pages/RoomPage'))
 
-/** `/:code` is the room; anything that isn't shaped like a code is a 404 (typos of app pages). */
-function RoomRoute() {
-  const { code = '' } = useParams()
-  if (!looksLikeRoomCode(code)) return <NotFoundPage />
-  return (
-    <Suspense fallback={<PageLoader label="Preparing the room…" />}>
-      <RoomPage key={code.toLowerCase()} />
-    </Suspense>
-  )
-}
-
-/** Old links (emails, bookmarks) keep working. */
-function LegacyRoomRedirect() {
-  const { roomId = '' } = useParams()
-  return <Navigate to={paths.room(roomId)} replace />
-}
-
 export const router = createBrowserRouter([
   {
     errorElement: <RouteErrorPage />,
     children: [
+      { index: true, element: <Navigate to={paths.dashboard} replace /> },
+
       {
         element: <GuestRoute />,
         children: [
@@ -51,7 +33,7 @@ export const router = createBrowserRouter([
             element: <AuthLayout />,
             children: [
               { path: paths.login, element: <LoginPage /> },
-              { path: paths.signup, element: <RegisterPage /> },
+              { path: paths.register, element: <RegisterPage /> },
               { path: paths.forgotPassword, element: <ForgotPasswordPage /> },
             ],
           },
@@ -67,28 +49,25 @@ export const router = createBrowserRouter([
           {
             element: <AppLayout />,
             children: [
-              { index: true, element: <DashboardPage /> },
+              { path: paths.dashboard, element: <DashboardPage /> },
               { path: paths.interviews, element: <InterviewsPage /> },
               { path: paths.newInterview, element: <NewInterviewPage /> },
-              { path: '/interviews/:interviewId', element: <InterviewDetailsPage /> },
-              { path: '/interviews/:interviewId/feedback', element: <InterviewFeedbackPage /> },
               { path: paths.feedback, element: <FeedbackPage /> },
-              { path: paths.settings, element: <ProfilePage /> },
-              { path: paths.join, element: <JoinRoomPage /> },
+              { path: paths.profile, element: <ProfilePage /> },
+              { path: paths.joinRoom, element: <JoinRoomPage /> },
             ],
           },
-          // Full-screen interview room (pre-join, lobby, call and "ended" states), outside the app chrome.
-          { path: '/:code', element: <RoomRoute /> },
+          {
+            // Full-screen interview room, outside the app chrome.
+            path: '/room/join/:roomId',
+            element: (
+              <Suspense fallback={<PageLoader label="Preparing the room…" />}>
+                <RoomPage />
+              </Suspense>
+            ),
+          },
         ],
       },
-
-      // Legacy URLs.
-      { path: '/dashboard', element: <Navigate to={paths.home} replace /> },
-      { path: '/register', element: <Navigate to={paths.signup} replace /> },
-      { path: '/profile', element: <Navigate to={paths.settings} replace /> },
-      { path: '/settings', element: <Navigate to={paths.settings} replace /> },
-      { path: '/room/join', element: <Navigate to={paths.join} replace /> },
-      { path: '/room/join/:roomId', element: <LegacyRoomRedirect /> },
 
       { path: '*', element: <NotFoundPage /> },
     ],

@@ -19,8 +19,7 @@ import {
 import { selectCurrentUser } from '@/features/auth/slices/authSlice'
 import { InterviewHistoryList } from '@/features/interviews/components/InterviewHistoryList'
 import { useInterviewHistory } from '@/features/interviews/hooks/useInterviews'
-import { UpcomingInterviews } from '@/features/interviews/components/UpcomingInterviews'
-import { cn } from '@/lib/utils'
+import { ProfileRequired } from '@/features/profile/components/ProfileRequired'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { paths } from '@/routes/paths'
 
@@ -29,50 +28,22 @@ const PAGE_SIZE = 10
 const parseEnum = <T extends string>(values: readonly T[], raw: string | null): T | undefined =>
   values.includes(raw as T) ? (raw as T) : undefined
 
-type View = 'upcoming' | 'past'
-
 export default function InterviewsPage() {
-  useDocumentTitle('Interviews')
-  const [searchParams, setSearchParams] = useSearchParams()
-  const view: View = searchParams.get('view') === 'past' ? 'past' : 'upcoming'
-
+  useDocumentTitle('Interview history')
   return (
     <>
       <PageHeader
-        title="Interviews"
-        description="What's coming up, and every interview you've taken part in."
+        title="Interview history"
+        description="Every interview session you've taken part in."
         actions={
           <Link to={paths.newInterview} className={buttonClasses()}>
             <CalendarPlus className="h-4 w-4" /> New interview
           </Link>
         }
       />
-      <div role="tablist" className="mb-4 inline-flex gap-1 rounded-lg bg-surface p-1">
-        {(
-          [
-            { id: 'upcoming', label: 'Upcoming' },
-            { id: 'past', label: 'Past' },
-          ] as const
-        ).map(({ id, label }) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={view === id}
-            onClick={() => setSearchParams(id === 'upcoming' ? {} : { view: id })}
-            className={cn('h-8 rounded-md px-4 text-[13px] font-medium', view === id ? 'bg-elevated text-fg' : 'text-fg-muted hover:text-fg')}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      {view === 'upcoming' ? (
-        <Card className="px-5">
-          <UpcomingInterviews />
-        </Card>
-      ) : (
+      <ProfileRequired feature="your interview history">
         <InterviewHistory />
-      )}
+      </ProfileRequired>
     </>
   )
 }
@@ -124,7 +95,7 @@ function InterviewHistory() {
           ))}
         </Select>
         {hasFilters && (
-          <Button variant="ghost" size="sm" onClick={() => setSearchParams({ view: 'past' })} leftIcon={<FilterX className="h-3.5 w-3.5" />}>
+          <Button variant="ghost" size="sm" onClick={() => setSearchParams({})} leftIcon={<FilterX className="h-3.5 w-3.5" />}>
             Clear filters
           </Button>
         )}
@@ -141,7 +112,7 @@ function InterviewHistory() {
           description={hasFilters ? 'Try a different status or type.' : 'Completed and upcoming sessions you join will appear here.'}
           action={
             hasFilters ? (
-              <Button variant="secondary" onClick={() => setSearchParams({ view: 'past' })}>
+              <Button variant="secondary" onClick={() => setSearchParams({})}>
                 Clear filters
               </Button>
             ) : (

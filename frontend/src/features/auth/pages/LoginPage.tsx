@@ -45,7 +45,7 @@ export default function LoginPage() {
     <>
       <AuthHeading title="Welcome back" description="Sign in to continue your interview preparation." />
 
-      {state.from && state.from !== paths.home && !login.error && (
+      {state.from && state.from !== paths.dashboard && !login.error && (
         <Alert tone="info" className="mb-5">
           Please sign in to continue.
         </Alert>
@@ -79,7 +79,7 @@ export default function LoginPage() {
 
       <p className="mt-6 text-center text-sm text-fg-muted">
         Don&apos;t have an account?{' '}
-        <Link to={paths.signup} state={state.from ? { from: state.from } : undefined} className="font-medium text-primary-hover hover:underline">
+        <Link to={paths.register} state={state.from ? { from: state.from } : undefined} className="font-medium text-primary-hover hover:underline">
           Create one
         </Link>
       </p>

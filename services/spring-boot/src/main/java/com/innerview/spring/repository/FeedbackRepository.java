@@ -13,10 +13,6 @@ import java.util.UUID;
 
 @Repository
 public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
-    java.util.List<Feedback> findByInterviewId(Long interviewId);
-
-    boolean existsByInterviewIdAndReviewerIdAndRevieweeId(Long interviewId, UUID reviewerId, UUID revieweeId);
-
 
     @Query("""
         SELECT new com.innerview.spring.dto.FeedbackDto(

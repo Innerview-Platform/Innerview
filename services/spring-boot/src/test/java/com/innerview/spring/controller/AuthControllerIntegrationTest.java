@@ -89,17 +89,6 @@ class AuthControllerIntegrationTest {
 	}
 
 	@Test
-	void testRefreshToken_FromCookie_RotatesCookieAndHidesTokenFromBody() throws Exception {
-		RefreshToken refreshToken = refreshTokenService.createRefreshToken(testUser);
-
-		mockMvc.perform(post("/api/auth/refresh").cookie(new jakarta.servlet.http.Cookie("refresh_token", refreshToken.getToken())))
-				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.accessToken").exists())
-				.andExpect(jsonPath("$.refresh_token").doesNotExist())
-				.andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().exists("Set-Cookie"));
-	}
-
-	@Test
 	void testRefreshToken_MissingToken() throws Exception {
 		mockMvc.perform(post("/api/auth/refresh")
 						.contentType(MediaType.APPLICATION_JSON)

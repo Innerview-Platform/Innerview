@@ -40,8 +40,8 @@ export function RoomCreatedCard({ interview, type, startTime, onCreateAnother }:
         <div>
           <p className="text-xs font-medium text-fg-muted uppercase">Room code</p>
           <div className="mt-1.5 flex items-center justify-between gap-3 rounded-lg border border-border bg-elevated px-4 py-3">
-            <span className="font-mono text-2xl tracking-[0.1em]">{interview.displayCode}</span>
-            <CopyButton value={interview.displayCode} label="Copy code" />
+            <span className="font-mono text-2xl tracking-[0.2em]">{interview.roomId}</span>
+            <CopyButton value={interview.roomId} label="Copy code" />
           </div>
         </div>
         <div>

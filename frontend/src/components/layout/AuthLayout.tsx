@@ -24,7 +24,7 @@ export function AuthLayout() {
           }}
           aria-hidden
         />
-        <Link to={paths.home} className="relative w-fit">
+        <Link to={paths.root} className="relative w-fit">
           <Logo size={32} />
         </Link>
         <div className="relative">
@@ -50,7 +50,7 @@ export function AuthLayout() {
       </aside>
 
       <main className="flex flex-1 flex-col items-center justify-center px-5 py-12 sm:px-10">
-        <Link to={paths.home} className="mb-10 lg:hidden">
+        <Link to={paths.root} className="mb-10 lg:hidden">
           <Logo size={30} />
         </Link>
         <div className="w-full max-w-[400px] animate-fade-in">

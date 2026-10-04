@@ -32,21 +32,13 @@ public class JwtUtil {
 		return Keys.hmacShaKeyFor(keyBytes);
 	}
 
-	/** Token type claim: access tokens authenticate API calls, refresh tokens only mint new ones. */
-	public static final String TYPE_CLAIM = "typ";
-	public static final String TYPE_ACCESS = "access";
-	public static final String TYPE_REFRESH = "refresh";
-
 	public String generateAccessToken(UUID userId) {
 		Map<String, Object> claims = new HashMap<>();
-		claims.put(TYPE_CLAIM, TYPE_ACCESS);
 		return createToken(claims, userId.toString(), accessTokenExpiration);
 	}
 
 	public String generateRefreshToken(UUID userId) {
 		Map<String, Object> claims = new HashMap<>();
-		claims.put(TYPE_CLAIM, TYPE_REFRESH);
-		claims.put("jti", UUID.randomUUID().toString()); // unique even when minted twice in the same second
 		return createToken(claims, userId.toString(), refreshTokenExpiration);
 	}
 
@@ -94,15 +86,6 @@ public class JwtUtil {
 			return extractExpiration(token).before(new Date());
 		} catch (JwtException e) {
 			return true;
-		}
-	}
-
-	/** Valid, unexpired and an access token (refresh tokens must not authenticate API calls). */
-	public boolean validateAccessToken(String token) {
-		try {
-			return !isTokenExpired(token) && TYPE_ACCESS.equals(extractClaim(token, c -> c.get(TYPE_CLAIM, String.class)));
-		} catch (JwtException e) {
-			return false;
 		}
 	}
 

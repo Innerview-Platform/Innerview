@@ -1,4 +1,3 @@
-import { toast } from 'sonner'
 import { useState } from 'react'
 import { ControlBar, GridLayout, LiveKitRoom, ParticipantTile, RoomAudioRenderer, useTracks } from '@livekit/components-react'
 import { Track } from 'livekit-client'
@@ -44,15 +43,7 @@ function VideoGrid() {
   )
 }
 
-/** Camera/microphone choices from the pre-join screen. */
-export interface DevicePreferences {
-  audio: boolean
-  video: boolean
-  audioDeviceId?: string
-  videoDeviceId?: string
-}
-
-export function VideoPanel({ roomId, devices }: { roomId: string; devices?: DevicePreferences }) {
+export function VideoPanel({ roomId }: { roomId: string }) {
   const enabled = Boolean(config.livekitUrl)
   const token = useSfuToken(roomId, enabled)
   const [connectionError, setConnectionError] = useState<Error | null>(null)
@@ -105,11 +96,9 @@ export function VideoPanel({ roomId, devices }: { roomId: string; devices?: Devi
         serverUrl={config.livekitUrl}
         token={token.data}
         connect
-        audio={devices?.audio ? (devices.audioDeviceId ? { deviceId: devices.audioDeviceId } : true) : false}
-        video={devices?.video ? (devices.videoDeviceId ? { deviceId: devices.videoDeviceId } : true) : false}
+        audio={false}
+        video={false}
         onError={setConnectionError}
-        // A blocked or missing camera/microphone isn't a connection problem: join without it.
-        onMediaDeviceFailure={(failure) => toast.warning('Camera or microphone unavailable', { description: failure ? `You joined without it (${failure}).` : undefined })}
         data-lk-theme="default"
         className="flex flex-col"
         style={{ background: 'var(--color-surface)' }}

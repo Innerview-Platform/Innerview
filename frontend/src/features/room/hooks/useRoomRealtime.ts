@@ -1,147 +1,125 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { getSignalingUrl } from '@/constants/config'
-import { roomApi } from '@/features/room/api/roomApi'
+import type { InterviewRole } from '@/constants/enums'
+import { roomKeys } from '@/features/room/hooks/useRoom'
 import { createRoomSocket, type RoomSocket } from '@/features/room/realtime/roomSocket'
-import type {
-  ChatMessage,
-  CodeRunEvent,
-  ConnectionStatus,
-  LobbyMessage,
-  Me,
-  OutgoingSignalType,
-  RoomClosed,
-  RoomError,
-  RoomNotice,
-  RoomState,
-  SessionMessage,
-} from '@/features/room/types'
+import type { ActiveRoom, CodeUpdatePayload, ConnectionStatus, OutgoingSignalType } from '@/features/room/types'
 
-type Listener<T> = (value: T) => void
-
-function useListeners<T>() {
-  const listeners = useRef(new Set<Listener<T>>())
-  const subscribe = useCallback((listener: Listener<T>) => {
-    listeners.current.add(listener)
-    return () => void listeners.current.delete(listener)
-  }, [])
-  const emit = useCallback((value: T) => listeners.current.forEach((listener) => listener(value)), [])
-  return [subscribe, emit] as const
-}
+type CodeListener = (payload: CodeUpdatePayload) => void
+type JoinListener = (userId: string) => void
 
 interface UseRoomRealtimeOptions {
-  code: string
-  /** From the join call. */
-  initialState: RoomState
-  initialMe: Me
-  initialTicket: string
-  /** Take over this user's connection in other tabs ("Join here"). */
-  takeover: boolean
+  roomId: string
+  currentUserId: string
+  accessToken: string | null
+  /** False until the REST join succeeded, and again once the user has left. */
   enabled: boolean
 }
 
-let tabId: string | null = null
-function getTabId() {
-  tabId ??= crypto.randomUUID()
-  return tabId
-}
+const REFRESH_DEBOUNCE_MS = 250
+/** ROLE_UPDATE from a non-owner fails silently server-side; no broadcast within this window means it was rejected. */
+const ROLE_UPDATE_TIMEOUT_MS = 4_000
 
-/**
- * Live connection to an interview room: room state (participants, host, timer), chat, notices, the
- * code runner, lobby requests and per-user session events. Every (re)connect uses a fresh ticket.
- */
-export function useRoomRealtime({ code, initialState, initialMe, initialTicket, takeover, enabled }: UseRoomRealtimeOptions) {
+export function useRoomRealtime({ roomId, currentUserId, accessToken, enabled }: UseRoomRealtimeOptions) {
+  const queryClient = useQueryClient()
   const [status, setStatus] = useState<ConnectionStatus>('idle')
   const [failureReason, setFailureReason] = useState<string | null>(null)
-  const [room, setRoom] = useState(initialState)
-  const [me, setMe] = useState(initialMe)
-  const [closed, setClosed] = useState<RoomClosed | null>(null)
-  const [session, setSession] = useState<SessionMessage | null>(null)
   const [connectionAttempt, setConnectionAttempt] = useState(0)
 
   const socketRef = useRef<RoomSocket | null>(null)
-  const ticketRef = useRef<string | null>(initialTicket)
-  const takeoverRef = useRef(takeover)
-
-  const [subscribeRun, emitRun] = useListeners<CodeRunEvent>()
-  const [subscribeChat, emitChat] = useListeners<ChatMessage>()
-  const [subscribeNotice, emitNotice] = useListeners<RoomNotice>()
-  const [subscribeLobby, emitLobby] = useListeners<LobbyMessage>()
-  const [subscribeError, emitError] = useListeners<RoomError>()
-
-  /** A room ticket for the other services (Hocuspocus, tldraw); reuses the join ticket first. */
-  const getTicket = useCallback(async (): Promise<string | null> => {
-    const cached = ticketRef.current
-    if (cached) {
-      ticketRef.current = null
-      return cached
-    }
-    try {
-      const result = await roomApi.ticket(code)
-      setMe({ role: result.role, host: result.host, staff: result.staff, readonly: result.readonly })
-      return result.ticket
-    } catch {
-      return null
-    }
-  }, [code])
+  const codeListeners = useRef(new Set<CodeListener>())
+  const joinListeners = useRef(new Set<JoinListener>())
+  const pendingRoleUpdates = useRef(new Map<string, ReturnType<typeof setTimeout>>())
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled || !accessToken) return
+
+    const refreshRoomState = () => {
+      if (refreshTimer.current) clearTimeout(refreshTimer.current)
+      refreshTimer.current = setTimeout(() => queryClient.invalidateQueries({ queryKey: roomKeys.state(roomId) }), REFRESH_DEBOUNCE_MS)
+    }
+
     const socket = createRoomSocket({
       url: getSignalingUrl(),
-      code,
-      clientId: getTabId(),
-      takeover: takeoverRef.current,
-      getTicket,
+      roomId,
+      accessToken,
       onStatusChange: (next, reason) => {
         setStatus(next)
         setFailureReason(reason ?? null)
-        // The server announces our own connection before we're subscribed: fetch the current state.
-        if (next === 'connected') roomApi.state(code).then(setRoom).catch(() => {})
       },
-      onState: setRoom,
-      onChat: emitChat,
-      onClosed: setClosed,
-      onNotice: emitNotice,
-      onRun: emitRun,
-      onSession: (message) => {
-        setSession(message)
-        // Role changed: pick up the new permissions (the editors reconnect with a new ticket by themselves).
-        if (message.type === 'PERMISSIONS') void getTicket()
+      onConnected: () => {
+        socket.send('JOIN')
       },
-      onLobby: emitLobby,
-      onError: emitError,
+      onRoomEvent: (event) => {
+        if (event.userId === currentUserId) return
+        refreshRoomState()
+        if (event.kind === 'participant-connected') joinListeners.current.forEach((listener) => listener(event.userId))
+      },
+      onCode: (payload) => codeListeners.current.forEach((listener) => listener(payload)),
+      onRoleChange: ({ userId, newRole }) => {
+        const pending = pendingRoleUpdates.current.get(userId)
+        if (pending) {
+          clearTimeout(pending)
+          pendingRoleUpdates.current.delete(userId)
+        }
+        queryClient.setQueryData<ActiveRoom>(roomKeys.state(roomId), (room) => {
+          const participant = room?.participants[userId]
+          if (!room || !participant) return room
+          return { ...room, participants: { ...room.participants, [userId]: { ...participant, role: newRole as InterviewRole } } }
+        })
+      },
+      onFeatureAvailable: refreshRoomState,
     })
-    takeoverRef.current = false
     socketRef.current = socket
+
+    const pendingUpdates = pendingRoleUpdates.current
     return () => {
       socketRef.current = null
+      if (refreshTimer.current) clearTimeout(refreshTimer.current)
+      pendingUpdates.forEach(clearTimeout)
+      pendingUpdates.clear()
       void socket.disconnect()
       setStatus('idle')
     }
-  }, [enabled, code, getTicket, emitChat, emitNotice, emitRun, emitLobby, emitError, connectionAttempt])
+  }, [enabled, accessToken, roomId, currentUserId, queryClient, connectionAttempt])
 
   const send = useCallback((type: OutgoingSignalType, payload?: unknown) => socketRef.current?.send(type, payload) ?? false, [])
-  const reconnect = useCallback(() => setConnectionAttempt((n) => n + 1), [])
-  /** Ticket fetcher for Hocuspocus / tldraw (always fresh). */
-  const fetchTicket = useCallback(async () => (await roomApi.ticket(code)).ticket, [code])
 
-  return {
-    code,
-    status,
-    failureReason,
-    room,
-    me,
-    closed,
-    session,
-    send,
-    reconnect,
-    fetchTicket,
-    subscribeRun,
-    subscribeChat,
-    subscribeNotice,
-    subscribeLobby,
-    subscribeError,
-  }
+  const subscribeCode = useCallback((listener: CodeListener) => {
+    codeListeners.current.add(listener)
+    return () => void codeListeners.current.delete(listener)
+  }, [])
+
+  const subscribeParticipantJoined = useCallback((listener: JoinListener) => {
+    joinListeners.current.add(listener)
+    return () => void joinListeners.current.delete(listener)
+  }, [])
+
+  const changeRole = useCallback(
+    (targetUserId: string, newRole: InterviewRole) => {
+      if (!send('ROLE_UPDATE', { targetUserId, newRole })) {
+        toast.error('Not connected', { description: 'Reconnect to the room to change roles.' })
+        return
+      }
+      const existing = pendingRoleUpdates.current.get(targetUserId)
+      if (existing) clearTimeout(existing)
+      pendingRoleUpdates.current.set(
+        targetUserId,
+        setTimeout(() => {
+          pendingRoleUpdates.current.delete(targetUserId)
+          toast.error("Role wasn't changed", { description: 'Only the person who created the room can change roles.' })
+        }, ROLE_UPDATE_TIMEOUT_MS),
+      )
+    },
+    [send],
+  )
+
+  const reconnect = useCallback(() => setConnectionAttempt((n) => n + 1), [])
+
+  return { status, failureReason, send, subscribeCode, subscribeParticipantJoined, changeRole, reconnect }
 }
 
 export type RoomRealtime = ReturnType<typeof useRoomRealtime>

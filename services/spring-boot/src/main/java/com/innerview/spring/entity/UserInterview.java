@@ -28,7 +28,7 @@ public class UserInterview {
 
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false)
     private InterviewRole role;
 
     @CreationTimestamp

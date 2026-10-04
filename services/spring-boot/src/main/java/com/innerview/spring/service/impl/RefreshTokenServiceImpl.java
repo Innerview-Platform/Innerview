@@ -28,7 +28,9 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
 	@Transactional
 	public RefreshToken createRefreshToken(User user) {
-		// Each device/browser keeps its own refresh token; rotation revokes only the one used.
+		// Delete any existing refresh token for this user
+		refreshTokenRepository.deleteByUser(user);
+
 		// Generate new refresh token
 		String tokenString = jwtUtil.generateRefreshToken(user.getId());
 

@@ -48,42 +48,6 @@ public class Interview {
   private UUID ownerId;
   private String roomId;
 
-  /** Final content of the shared code editor, saved when the interview ends. */
-  @Column(columnDefinition = "TEXT")
-  private String sharedCode;
-
-  /** Final problem statement / notes, saved when the interview ends. */
-  @Column(columnDefinition = "TEXT")
-  private String problemNotes;
-
-  /** Interviewers' private notes (never shown to the candidate). */
-  @Column(columnDefinition = "TEXT")
-  private String interviewerNotes;
-
-  /** Optional name shown in lists, invites and the room header. */
-  @Column(length = 120)
-  private String title;
-
-  /** Who may enter without being let in; null in older rows means ASK_TO_JOIN. */
-  @Enumerated(EnumType.STRING)
-  @Column(length = 20)
-  private com.innerview.spring.enums.AccessPolicy accessPolicy;
-
-  /** The host may extend a live interview once. */
-  private Boolean extended;
-
-  /** The creator's role in their own interview (they're always the host). */
-  @Enumerated(EnumType.STRING)
-  @Column(length = 20)
-  private com.innerview.spring.enums.InterviewRole ownerRole;
-
-  /** When the first person entered the room (null until then). */
-  private Instant liveSince;
-
-  public com.innerview.spring.enums.AccessPolicy effectiveAccessPolicy() {
-    return accessPolicy == null ? com.innerview.spring.enums.AccessPolicy.ASK_TO_JOIN : accessPolicy;
-  }
-
   @ManyToMany
   @JoinTable(
       name = "interview_problems",

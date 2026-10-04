@@ -4,9 +4,5 @@ package com.innerview.spring.enums;
 public enum NotificationType {
   WELCOME,
   INTERVIEW_SCHEDULED,
-  INTERVIEW_REMINDER,
-  /** Someone invited you to an interview. */
-  INTERVIEW_INVITE,
-  /** Someone is waiting in your interview's lobby. */
-  JOIN_REQUEST
+  INTERVIEW_REMINDER
 }

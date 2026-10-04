@@ -1,8 +1,5 @@
 package com.innerview.spring.scheduler;
 
-import com.innerview.spring.core.util.RoomUtil;
-import com.innerview.spring.dto.InterviewInviteEmailNotification;
-import com.innerview.spring.enums.InviteStatus;
 import com.innerview.spring.dto.InterviewReminderNotification;
 import com.innerview.spring.entity.Interview;
 import com.innerview.spring.enums.InterviewStatus;
@@ -41,8 +38,7 @@ public class InterviewReminderScheduler {
   private static final Duration DEDUPE_TTL = Duration.ofHours(26);
 
   private final InterviewRepository interviewRepository;
-  private final com.innerview.spring.repository.UserRepository userRepository;
-  private final com.innerview.spring.repository.InterviewInviteRepository inviteRepository;
+  private final UserProfileService userProfileService;
   private final NotificationPublisherService notificationPublisherService;
   private final StringRedisTemplate stringRedisTemplate;
 
@@ -92,35 +88,35 @@ public class InterviewReminderScheduler {
       return; // already sent for this interview+interval
     }
 
-    RoomSize roomSize =
-        interview.getRoomSize() != null && interview.getRoomSize() == 2 ? RoomSize.ONE_ON_ONE : RoomSize.MANY;
-    String sessionUrl = frontendUrl + "/" + RoomUtil.format(RoomUtil.canonical(interview.getRoomId()));
+    try {
+      var ownerProfile = userProfileService.getUserProfile(interview.getOwnerId());
+      String recipientEmail = ownerProfile.getUser().getEmail();
+      RoomSize roomSize =
+          interview.getRoomSize() != null && interview.getRoomSize() == 2
+              ? RoomSize.ONE_ON_ONE
+              : RoomSize.MANY;
+      String sessionUrl = frontendUrl + "/room/join/" + interview.getRoomId();
 
-    // The owner and everyone invited (people without an account get the email only).
-    java.util.Map<String, java.util.UUID> recipients = new java.util.LinkedHashMap<>();
-    userRepository.findById(interview.getOwnerId()).ifPresent(owner -> recipients.put(owner.getEmail(), owner.getId()));
-    for (var invite : inviteRepository.findByInterviewIdAndStatusNot(interview.getId(), InviteStatus.REVOKED)) {
-      if (invite.getStatus() == InviteStatus.DECLINED) continue;
-      recipients.putIfAbsent(invite.getEmail(), invite.getUserId());
+      InterviewReminderNotification notification =
+          new InterviewReminderNotification(
+              interview.getOwnerId().toString(),
+              recipientEmail,
+              interview.getType(),
+              roomSize,
+              interview.getStartTime(),
+              interval,
+              sessionUrl);
+
+      notificationPublisherService.dispatch(notification, NotificationType.INTERVIEW_REMINDER);
+      log.info(
+          "Queued {} reminder for interviewId={} recipient={}",
+          interval,
+          interview.getId(),
+          interview.getOwnerId());
+    } catch (Exception e) {
+      log.error(
+          "Failed to send {} reminder for interviewId={}", interval, interview.getId(), e);
     }
-
-    recipients.forEach((email, userId) -> {
-      try {
-        notificationPublisherService.dispatch(
-            new InterviewReminderNotification(
-                (userId == null ? InterviewInviteEmailNotification.NO_ACCOUNT : userId).toString(),
-                email,
-                interview.getType(),
-                roomSize,
-                interview.getStartTime(),
-                interval,
-                sessionUrl),
-            NotificationType.INTERVIEW_REMINDER);
-        log.info("Queued {} reminder for interviewId={} recipient={}", interval, interview.getId(), email);
-      } catch (Exception e) {
-        log.error("Failed to send {} reminder for interviewId={} to {}", interval, interview.getId(), email, e);
-      }
-    });
   }
 
   private Duration leadTime(ReminderInterval interval) {

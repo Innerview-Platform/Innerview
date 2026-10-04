@@ -40,7 +40,7 @@ export function ProfileRequired({ feature, children }: ProfileRequiredProps) {
           title="Create your profile first"
           description={`InnerView needs a profile before it can show ${feature}.`}
           action={
-            <Link to={paths.settings} className={buttonClasses()}>
+            <Link to={paths.profile} className={buttonClasses()}>
               Create profile
             </Link>
           }

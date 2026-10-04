@@ -3,19 +3,14 @@ package com.innerview.spring.core.config;
 import java.security.Principal;
 import java.util.UUID;
 
-/**
- * The authenticated STOMP session: who, in which room (from their room ticket), from which tab.
- * {@link #getName()} is the user id, which is what user destinations ({@code /user/queue/...}) use.
- */
+/** StompPrincipal */
 public class StompPrincipal implements Principal {
-  private final UUID userId;
-  private final String roomId;
-  private final String clientId;
+  private UUID userId;
+  private String roomId;
 
-  public StompPrincipal(UUID userId, String roomId, String clientId) {
+  public StompPrincipal(UUID userId, String roomId) {
     this.userId = userId;
     this.roomId = roomId;
-    this.clientId = clientId;
   }
 
   @Override
@@ -29,9 +24,5 @@ public class StompPrincipal implements Principal {
 
   public String getRoomId() {
     return roomId;
-  }
-
-  public String getClientId() {
-    return clientId;
   }
 }

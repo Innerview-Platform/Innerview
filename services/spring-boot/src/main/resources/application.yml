@@ -74,7 +74,7 @@ notification:
     email: 5
 # Server configuration
 server:
-  port: ${BACKEND_PORT:8080}
+  port: 8080
   error:
     include-message: always
 
@@ -88,7 +88,7 @@ jwt:
 
 # Custom Application configurations
 frontend:
-  url: ${FRONTEND_URL:http://localhost:3000}
+  url: "http://localhost:3000"
 
 interview:
   duration: 150
@@ -96,33 +96,6 @@ submission:
   judging:
     executor:
       pool-size: 5
-# Collaboration services (internal URLs the backend calls)
-collaboration:
-  editor-url: ${EDITOR_URL:http://localhost:1234}
-  canvas-url: ${CANVAS_URL:http://localhost:5858}
-
-# LiveKit (video). --dev mode uses devkey/secret.
-livekit:
-  url: ${LIVEKIT_URL:http://localhost:7880}
-  api-key: ${LIVEKIT_API_KEY:devkey}
-  api-secret: ${LIVEKIT_API_SECRET:secret}
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics,prometheus
-  endpoint:
-    health:
-      show-details: never
-
-# Piston code execution (https://github.com/engineer-man/piston)
-piston:
-  url: ${PISTON_URL:http://127.0.0.1:2000}
-  interactive:
-    # Must not exceed the container's PISTON_RUN_TIMEOUT / PISTON_RUN_CPU_TIME (see docker-compose.yml).
-    run-timeout-ms: 300000
-    run-cpu-time-ms: 10000
 judge:
   execution:
-    url: ${PISTON_URL:http://127.0.0.1:2000}/api/v2/execute
+    url: http://127.0.0.1:2000/api/v2/execute

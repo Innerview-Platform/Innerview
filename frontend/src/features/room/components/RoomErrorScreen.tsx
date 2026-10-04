@@ -28,10 +28,10 @@ export function RoomErrorScreen({ error, onRetry, retrying }: { error: unknown; 
         <Button variant="secondary" onClick={onRetry} loading={retrying}>
           Try again
         </Button>
-        <Link to={paths.join} className={buttonClasses({ variant: 'secondary' })}>
+        <Link to={paths.joinRoom} className={buttonClasses({ variant: 'secondary' })}>
           Enter another code
         </Link>
-        <Link to={paths.home} className={buttonClasses()}>
+        <Link to={paths.dashboard} className={buttonClasses()}>
           Dashboard
         </Link>
       </div>

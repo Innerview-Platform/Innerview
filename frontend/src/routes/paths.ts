@@ -1,20 +1,16 @@
-import { formatCode } from '@/features/room/utils/roomCode'
-
 export const paths = {
-  /** Home (dashboard) when signed in. */
-  home: '/',
+  root: '/',
   login: '/login',
-  signup: '/signup',
+  register: '/register',
   forgotPassword: '/forgot-password',
   /** Must match the link built by GmailEmailService: `${frontend.url}/reset-password?token=...` */
   resetPassword: '/reset-password',
+  dashboard: '/dashboard',
   interviews: '/interviews',
   newInterview: '/interviews/new',
-  interview: (id: number | string) => `/interviews/${id}`,
-  interviewFeedback: (id: number | string) => `/interviews/${id}/feedback`,
   feedback: '/feedback',
-  settings: '/settings/profile',
-  join: '/join',
-  /** Must match the links built by the backend: `${frontend.url}/abc-defg-hij` */
-  room: (code: string) => `/${formatCode(code)}`,
+  profile: '/profile',
+  joinRoom: '/room/join',
+  /** Must match the link built by InterviewServiceImpl: `${frontend.url}/room/join/{roomId}` */
+  room: (roomId: string) => `/room/join/${encodeURIComponent(roomId)}`,
 } as const
