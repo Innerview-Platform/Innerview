@@ -1,48 +1,58 @@
-import { mkdirSync } from 'node:fs'
-import { join } from 'node:path'
-import Database from 'better-sqlite3'
+import { createClient } from 'redis'
+import * as Y from 'yjs'
 import { config } from './config.ts'
 
-mkdirSync(config.dataDir, { recursive: true })
+export const redis = createClient({ url: config.redisUrl, disableOfflineQueue: true })
+redis.on('error', (error) => console.error('[editor] Redis error', error))
 
-const db = new Database(join(config.dataDir, 'documents.db'))
-db.pragma('journal_mode = WAL')
-db.exec(`
-  CREATE TABLE IF NOT EXISTS documents (
-    name TEXT PRIMARY KEY,
-    data BLOB NOT NULL,
-    updated_at INTEGER NOT NULL
-  );
-  -- Every update to a room's code document, in order: the interview replay timeline.
-  CREATE TABLE IF NOT EXISTS updates (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    at INTEGER NOT NULL,
-    data BLOB NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS updates_by_name ON updates (name, id);
-  -- Rooms whose interview ended: documents become read-only.
-  CREATE TABLE IF NOT EXISTS closed_rooms (
-    room TEXT PRIMARY KEY,
-    closed_at INTEGER NOT NULL
-  );
-`)
-
-const selectDocument = db.prepare<[string], { data: Buffer }>('SELECT data FROM documents WHERE name = ?')
-const upsertDocument = db.prepare<[string, Buffer, number]>(
-  'INSERT INTO documents (name, data, updated_at) VALUES (?, ?, ?) ON CONFLICT(name) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at',
-)
-const insertUpdate = db.prepare<[string, number, Buffer]>('INSERT INTO updates (name, at, data) VALUES (?, ?, ?)')
-const selectUpdates = db.prepare<[string], { at: number; data: Buffer }>('SELECT at, data FROM updates WHERE name = ? ORDER BY id')
-const insertClosed = db.prepare<[string, number]>('INSERT OR IGNORE INTO closed_rooms (room, closed_at) VALUES (?, ?)')
-const selectClosed = db.prepare<[string], { room: string }>('SELECT room FROM closed_rooms WHERE room = ?')
+// Code keys match Spring's RedisPersistenceService; notes have separate keys.
+function keys(name: string) {
+  const [room, kind, ...rest] = name.split('/')
+  if (!/^[a-z0-9]{1,32}$/.test(room ?? '') || !['code', 'notes', 'private'].includes(kind) || rest.length) {
+    throw new Error('Invalid document name')
+  }
+  const prefix = kind === 'code' ? `room:${room}` : `room:${room}:${kind}`
+  return { state: `${prefix}:state`, text: `${prefix}:text`, version: `${prefix}:version`, updates: `room:${room}:editor:updates:${kind}`, kind }
+}
 
 export const store = {
-  load: (name: string): Uint8Array | null => selectDocument.get(name)?.data ?? null,
-  save: (name: string, state: Uint8Array) => upsertDocument.run(name, Buffer.from(state), Date.now()),
-  appendUpdate: (name: string, update: Uint8Array) => insertUpdate.run(name, Date.now(), Buffer.from(update)),
-  updates: (name: string) => selectUpdates.all(name),
-  closeRoom: (room: string) => insertClosed.run(room, Date.now()),
-  isClosed: (room: string) => Boolean(selectClosed.get(room)),
-  close: () => db.close(),
+  async load(name: string): Promise<Uint8Array | null> {
+    const state = await redis.get(keys(name).state)
+    return state === null ? null : Buffer.from(state, 'base64')
+  },
+  async save(name: string, state: Uint8Array): Promise<void> {
+    const documentKeys = keys(name)
+    const doc = new Y.Doc()
+    try {
+      Y.applyUpdate(doc, state)
+      // Persist state, text and version together. SET removes legacy six-hour TTLs.
+      await redis.multi()
+        .set(documentKeys.state, Buffer.from(state).toString('base64'))
+        .set(documentKeys.text, doc.getText(documentKeys.kind).toString())
+        .incr(documentKeys.version)
+        .persist(documentKeys.version)
+        .exec()
+    } finally {
+      doc.destroy()
+    }
+  },
+  async appendUpdate(name: string, update: Uint8Array): Promise<void> {
+    await redis.rPush(keys(name).updates, JSON.stringify({ at: Date.now(), data: Buffer.from(update).toString('base64') }))
+  },
+  async updates(name: string): Promise<Array<{ at: number; data: Buffer }>> {
+    return (await redis.lRange(keys(name).updates, 0, -1)).map((raw) => {
+      const row = JSON.parse(raw) as { at: number; data: string }
+      return { at: row.at, data: Buffer.from(row.data, 'base64') }
+    })
+  },
+  async closeRoom(room: string): Promise<void> {
+    // A retried close hook preserves the first end time.
+    await redis.set(`room:${room}:editor:closedAt`, String(Date.now()), { NX: true })
+  },
+  async isClosed(room: string): Promise<boolean> {
+    return (await redis.exists(`room:${room}:editor:closedAt`)) > 0
+  },
+  async close(): Promise<void> {
+    if (redis.isOpen) await redis.quit()
+  },
 }

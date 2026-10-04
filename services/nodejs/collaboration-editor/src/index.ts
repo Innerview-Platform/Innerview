@@ -6,7 +6,7 @@
  *   notes    the problem statement / discussion notes
  *   private  interviewers' private notes (host and interviewers only)
  *
- * Clients authenticate with a room ticket from the backend. Documents are persisted to SQLite,
+ * Clients authenticate with a room ticket from the backend. Documents are persisted to Redis,
  * mirrored to the backend (POST /api/internal/documents) and the code document's updates are kept
  * as a replay timeline.
  *
@@ -22,7 +22,7 @@ import { Database } from '@hocuspocus/extension-database'
 import { Server, type Hocuspocus } from '@hocuspocus/server'
 import * as Y from 'yjs'
 import { config } from './config.ts'
-import { store } from './store.ts'
+import { redis, store } from './store.ts'
 import { verifyTicket, type Ticket } from './tickets.ts'
 
 const KINDS = ['code', 'notes', 'private'] as const
@@ -55,8 +55,12 @@ async function pushSnapshot(room: string, kind: Kind, text: string) {
 
 function textOf(kind: Kind, state: Uint8Array | null): string {
   const doc = new Y.Doc()
-  if (state) Y.applyUpdate(doc, state)
-  return doc.getText(kind).toString()
+  try {
+    if (state) Y.applyUpdate(doc, state)
+    return doc.getText(kind).toString()
+  } finally {
+    doc.destroy()
+  }
 }
 
 const server = new Server<Context>({
@@ -71,7 +75,7 @@ const server = new Server<Context>({
     new Database({
       fetch: async ({ documentName }) => store.load(documentName),
       store: async ({ documentName, state }) => {
-        store.save(documentName, state)
+        await store.save(documentName, state)
       },
     }),
   ],
@@ -82,12 +86,12 @@ const server = new Server<Context>({
     if (!ticket || !target || ticket.room !== target.room) throw new Error('not-authorized')
     if (target.kind === 'private' && !ticket.staff) throw new Error('not-authorized')
     // Observers, review tickets and ended interviews are read-only.
-    if (ticket.readonly || store.isClosed(target.room)) connectionConfig.readOnly = true
+    if (ticket.readonly || await store.isClosed(target.room)) connectionConfig.readOnly = true
     return { ...ticket, kind: target.kind }
   },
 
   async onChange({ documentName, update }) {
-    if (documentName.endsWith('/code')) store.appendUpdate(documentName, update)
+    if (documentName.endsWith('/code')) await store.appendUpdate(documentName, update)
   },
 
   async afterStoreDocument({ documentName, document }) {
@@ -96,7 +100,14 @@ const server = new Server<Context>({
   },
 
   async onRequest({ request, response, instance }) {
-    const handled = await handleHttp(request, response, instance)
+    let handled: boolean
+    try {
+      handled = await handleHttp(request, response, instance)
+    } catch (error) {
+      console.error('[editor] HTTP storage operation failed', error)
+      sendJson(response, 503, { error: 'Storage unavailable' })
+      handled = true
+    }
     // Throwing null stops Hocuspocus from writing its default response.
     if (handled) throw null
   },
@@ -132,6 +143,7 @@ async function handleHttp(request: IncomingMessage, response: ServerResponse, in
   const url = new URL(request.url ?? '/', 'http://localhost')
 
   if (url.pathname === '/health') {
+    await redis.ping()
     sendJson(response, 200, { status: 'UP', documents: instance.getDocumentsCount(), connections: instance.getConnectionsCount() })
     return true
   }
@@ -143,7 +155,7 @@ async function handleHttp(request: IncomingMessage, response: ServerResponse, in
       sendJson(response, 401, { error: 'Unauthorized' })
       return true
     }
-    const updates = store.updates(`${replay[1]}/code`).map((row) => ({ at: row.at, update: row.data.toString('base64') }))
+    const updates = (await store.updates(`${replay[1]}/code`)).map((row) => ({ at: row.at, update: row.data.toString('base64') }))
     sendJson(response, 200, { updates })
     return true
   }
@@ -161,7 +173,8 @@ async function handleHttp(request: IncomingMessage, response: ServerResponse, in
     const texts: Record<string, string> = {}
     for (const kind of KINDS) {
       const live = instance.documents.get(`${room}/${kind}`)
-      texts[kind] = live ? live.getText(kind).toString() : textOf(kind, store.load(`${room}/${kind}`))
+      if (live) await store.save(`${room}/${kind}`, Y.encodeStateAsUpdate(live))
+      texts[kind] = live ? live.getText(kind).toString() : textOf(kind, await store.load(`${room}/${kind}`))
     }
     sendJson(response, 200, texts)
     return true
@@ -182,20 +195,25 @@ async function handleHttp(request: IncomingMessage, response: ServerResponse, in
   }
 
   // close: the interview ended.
-  store.closeRoom(room)
+  await store.closeRoom(room)
   instance.flushPendingStores()
-  for (const kind of KINDS) instance.closeConnections(`${room}/${kind}`)
+  for (const kind of KINDS) {
+    const live = instance.documents.get(`${room}/${kind}`)
+    if (live) await store.save(`${room}/${kind}`, Y.encodeStateAsUpdate(live))
+    instance.closeConnections(`${room}/${kind}`)
+  }
   sendJson(response, 200, { closed: true })
   return true
 }
 
+await redis.connect()
 await server.listen()
-console.log(`[editor] Hocuspocus listening on ws://${config.host}:${config.port} (data in ${config.dataDir})`)
+console.log(`[editor] Hocuspocus listening on ws://${config.host}:${config.port} (Redis persistence)`)
 
 const shutdown = async () => {
   server.hocuspocus.flushPendingStores()
   await server.destroy()
-  store.close()
+  await store.close()
   process.exit(0)
 }
 process.on('SIGINT', shutdown)

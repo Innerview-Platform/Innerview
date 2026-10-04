@@ -1,6 +1,7 @@
 package com.innerview.spring.service.impl;
 
 import com.innerview.spring.core.util.RoomTicketService;
+import com.innerview.spring.service.redis.RedisPersistenceService;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -26,12 +27,15 @@ public class CollaborationGateway {
   private final RestClient editor;
   private final RestClient canvas;
   private final RoomTicketService ticketService;
+  private final RedisPersistenceService redisPersistence;
 
   public CollaborationGateway(
       @Value("${collaboration.editor-url:http://localhost:1234}") String editorUrl,
       @Value("${collaboration.canvas-url:http://localhost:5858}") String canvasUrl,
-      RoomTicketService ticketService) {
+      RoomTicketService ticketService,
+      RedisPersistenceService redisPersistence) {
     this.ticketService = ticketService;
+    this.redisPersistence = redisPersistence;
     SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
     factory.setConnectTimeout(2_000);
     factory.setReadTimeout(5_000);
@@ -52,7 +56,12 @@ public class CollaborationGateway {
       return texts == null ? Map.of() : texts;
     } catch (Exception e) {
       log.warn("[Collab] Could not flush documents of room {}: {}", room, e.getMessage());
-      return Map.of();
+      try {
+        return redisPersistence.getDocumentTexts(room);
+      } catch (Exception redisError) {
+        log.warn("[Collab] Redis snapshots unavailable for room {}: {}", room, redisError.getMessage());
+        return Map.of();
+      }
     }
   }
 

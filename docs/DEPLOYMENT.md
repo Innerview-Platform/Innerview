@@ -194,7 +194,7 @@ docker compose up -d --build
 docker image prune -f
 ```
 
-Data survives updates. It lives in Docker volumes: `mysql-data`, `canvas-data`, `editor-data`,
+Data survives updates. It lives in Docker volumes: `mysql-data`, `redis-data`,
 `piston-packages` and `caddy-data`. **Never** run `docker compose down -v` on the server, because
 that deletes the volumes.
 

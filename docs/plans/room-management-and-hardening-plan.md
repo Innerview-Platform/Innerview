@@ -218,3 +218,11 @@ Everything above is implemented except the items marked *not done*. Tests: `test
 | §5 URLs | Done — `/`, `/signup`, `/join`, `/interviews` (`?view=past`), `/interviews/:id`, `/interviews/:id/feedback`, `/settings/profile`, `/:code`, with redirects from the old URLs. |
 | Observability | Done — actuator metrics with room/participant/lobby gauges; `/health` on both Node services. |
 | *Not done (by decision)* | Problem picker / running tests in the room, horizontal scaling (#25), session recording, AI summary. |
+
+## Milestone 4 storage decision
+
+Shared code, notes, private notes and replay are persisted in Redis alongside the
+Excalidraw canvas. The Java Redis key/persistence/debounce/expiry classes are
+retained; expiry events delegate to the unified lifecycle and database scheduling
+remains the authoritative time-limit mechanism. See `docs/MILESTONE_4_BRANCHES.md`
+for the reconstructed feature/subfeature merge history.

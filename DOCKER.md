@@ -206,7 +206,7 @@ per room in Redis, backed by the `redis-data` volume. The server accepts only va
 The code editor, the problem statement and the interviewers' private notes are Yjs documents on a
 self-hosted [Hocuspocus](https://tiptap.dev/docs/hocuspocus) server (`innerview-editor`, source in
 `services/nodejs/collaboration-editor`): incremental sync (no document size limit), live cursors,
-SQLite persistence in the `editor-data` volume, snapshots mirrored to MySQL, and a replay timeline
+Redis persistence in the `redis-data` volume, snapshots mirrored to MySQL, and a replay timeline
 for the interview summary.
 
 ## Room access

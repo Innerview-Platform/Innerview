@@ -62,7 +62,7 @@ export default function RegisterPage() {
         if (session) {
           toast.success('Account created', { description: 'Add a photo and your links to round out your profile.' })
           const from = (location.state as RedirectState | null)?.from
-          navigate(from?.startsWith('/') ? from : paths.settings, { replace: true })
+          navigate(from?.startsWith('/') ? from : paths.profile, { replace: true })
           dispatch(sessionStarted(session))
         } else {
           toast.success('Account created — please sign in.')
