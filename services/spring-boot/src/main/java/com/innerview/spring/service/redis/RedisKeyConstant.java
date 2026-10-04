@@ -39,4 +39,13 @@ public final class RedisKeyConstant {
     public static String roomVersion(String roomId) {
         return String.format(ROOM_VERSION, roomId);
     }
+
+    /** Text keys shared with the Hocuspocus Redis store. */
+    public static String documentText(String roomId, String kind) {
+        return switch (kind) {
+            case "code" -> roomText(roomId);
+            case "notes", "private" -> "room:" + roomId + ":" + kind + ":text";
+            default -> throw new IllegalArgumentException("Unknown document kind: " + kind);
+        };
+    }
 }
