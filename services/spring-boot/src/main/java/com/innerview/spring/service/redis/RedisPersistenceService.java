@@ -169,6 +169,20 @@ public class RedisPersistenceService {
         }
     }
 
+    /** Latest text snapshots, also available if the editor HTTP service is down. */
+    public java.util.Map<String, String> getDocumentTexts(String roomId) {
+        var kinds = java.util.List.of("code", "notes", "private");
+        var keys = kinds.stream().map(kind -> RedisKeyConstant.documentText(roomId, kind)).toList();
+        var values = redisTemplate.opsForValue().multiGet(keys);
+        var result = new java.util.HashMap<String, String>();
+        if (values != null) {
+            for (int i = 0; i < Math.min(kinds.size(), values.size()); i++) {
+                if (values.get(i) != null) result.put(kinds.get(i), values.get(i));
+            }
+        }
+        return result;
+    }
+
 
 
     /**
