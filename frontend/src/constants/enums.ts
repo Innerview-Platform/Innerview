@@ -6,6 +6,9 @@ export type ExperienceLevel = (typeof EXPERIENCE_LEVELS)[number]
 export const INTERVIEW_ROLES = ['INTERVIEWER', 'INTERVIEWEE', 'BOTH'] as const
 export type InterviewRole = (typeof INTERVIEW_ROLES)[number]
 
+export const EMPLOYMENT_STATUSES = ['EMPLOYED', 'STUDENT', 'NOT_EMPLOYED'] as const
+export type EmploymentStatus = (typeof EMPLOYMENT_STATUSES)[number]
+
 export const INTERVIEW_TYPES = ['PROBLEM_SOLVING', 'SYSTEM_DESIGN', 'HR', 'TECHNICAL'] as const
 export type InterviewType = (typeof INTERVIEW_TYPES)[number]
 
@@ -28,6 +31,12 @@ export const INTERVIEW_ROLE_LABELS: Record<InterviewRole, string> = {
   INTERVIEWER: 'Interviewer',
   INTERVIEWEE: 'Interviewee',
   BOTH: 'Both',
+}
+
+export const EMPLOYMENT_STATUS_LABELS: Record<EmploymentStatus, string> = {
+  EMPLOYED: 'Employed',
+  STUDENT: 'Student',
+  NOT_EMPLOYED: 'Not employed',
 }
 
 export const INTERVIEW_TYPE_LABELS: Record<InterviewType, string> = {

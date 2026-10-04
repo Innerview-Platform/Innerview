@@ -25,6 +25,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.innerview.spring.dto.stats.UserStatsChangedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -39,6 +41,7 @@ public class FeedbackService {
   private final InterviewRepository interviewRepository;
   private final UserInterviewRepository userInterviewRepository;
   private final UserRepository userRepository;
+  private final ApplicationEventPublisher events;
 
   @Transactional(readOnly = true)
   public FeedbackFormDto getForm(Long interviewId, UUID userId) {
@@ -58,6 +61,7 @@ public class FeedbackService {
           return new FeedbackFormDto.Reviewee(
               revieweeId,
               other.getUser().getName(),
+              other.getUser().getUsername(),
               other.getRole().name(),
               reviewingCandidate ? FeedbackRubric.forCandidate(interview.getType()) : FeedbackRubric.FOR_INTERVIEWER,
               reviewingCandidate && me.getRole() == InterviewRole.INTERVIEWER,
@@ -128,7 +132,10 @@ public class FeedbackService {
     feedback.setComment(request.comment() == null ? null : request.comment().strip());
     feedback.setScores(scores);
     feedback.setHireSignal(hireSignal);
-    return view(feedbackRepository.save(feedback));
+    Feedback saved = feedbackRepository.save(feedback);
+    // The reviewee's average rating on their profile; recomputed after this transaction commits.
+    events.publishEvent(new UserStatsChangedEvent(java.util.Set.of(request.revieweeId())));
+    return view(saved);
   }
 
   /** Interviewers and observers review candidates; candidates review interviewers. */
@@ -152,8 +159,10 @@ public class FeedbackService {
         f.getId(),
         f.getReviewer().getId(),
         f.getReviewer().getName(),
+        f.getReviewer().getUsername(),
         f.getReviewee().getId(),
         f.getReviewee().getName(),
+        f.getReviewee().getUsername(),
         f.getReviewerRole() == null ? null : f.getReviewerRole().name(),
         f.getRating(),
         f.getComment(),

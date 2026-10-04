@@ -7,6 +7,7 @@ import type {
   RegisterPayload,
   RegisterResponse,
   ResetPasswordPayload,
+  UsernameAvailability,
 } from '@/features/auth/types'
 
 export interface LoginResult {
@@ -40,6 +41,12 @@ export const authApi = {
   /** POST /api/auth/logout — needs the bearer token and the httpOnly refresh_token cookie. */
   async logout(): Promise<void> {
     await apiClient.post('/api/auth/logout')
+  },
+
+  /** GET /api/auth/username-available — format and uniqueness; signed-in users' own username counts as available. */
+  async checkUsername(username: string): Promise<UsernameAvailability> {
+    const { data } = await apiClient.get<UsernameAvailability>('/api/auth/username-available', { params: { username } })
+    return data
   },
 
   /** POST /api/auth/forgot-password — always answers with the same message. */

@@ -198,11 +198,19 @@ Data survives updates. It lives in Docker volumes: `mysql-data`, `redis-data`,
 `piston-packages` and `caddy-data`. **Never** run `docker compose down -v` on the server, because
 that deletes the volumes.
 
+New database columns and tables (for example usernames, profile files and `user_stats`) are added
+automatically when the backend starts. On startup the backend also recomputes every user's rating and
+interview counts in `user_stats`, and it repeats this every night at 03:30.
+
 ## Backups
 
 ```bash
-docker exec innerview-mysql sh -c 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" innerview' > innerview-$(date +%F).sql
+docker exec innerview-mysql sh -c 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" --hex-blob innerview' | gzip > innerview-$(date +%F).sql.gz
 ```
+
+Profile photos and resumes are stored in MySQL (the `stored_files` table), so this backup includes
+them. `--hex-blob` keeps those binary files intact in the dump. Uploads are limited to 5 MB each.
+Photos are shrunk to about 10–60 KB, so expect roughly 0.1–1 MB of database growth per user who uploads a resume.
 
 To browse the database from your laptop, use an SSH tunnel with DBeaver/DataGrip on
 `localhost:3306`:

@@ -35,6 +35,13 @@ public class User {
 	@Column(nullable = false, unique = true)
 	private String email;
 
+	/**
+	 * Public handle, unique across the platform and always lowercase (see UsernameRules). Null for
+	 * accounts created before usernames existed and for Google sign-ups until they complete their profile.
+	 */
+	@Column(unique = true, length = 30)
+	private String username;
+
 	@NotBlank(message = "Password is required")
 	@Column(nullable = false, name = "password_hash")
 	private String passwordHash;
@@ -73,6 +80,10 @@ public class User {
 
 	@Column(name = "reset_password_token_created_at")
 	private LocalDateTime resetPasswordTokenCreatedAt;
+
+	/** Set when the account was deleted; the row stays (anonymized) so shared interview history keeps working. */
+	@Column(name = "deleted_at")
+	private LocalDateTime deletedAt;
 
 	@Column(name = "forgot_password_count", nullable = false)
 	private Integer forgotPasswordCount = 0;

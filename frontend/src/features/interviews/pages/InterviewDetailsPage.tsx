@@ -24,6 +24,8 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { getErrorMessage } from '@/lib/apiError'
 import { cn, formatDateTime } from '@/lib/utils'
 import { paths } from '@/routes/paths'
+import { Avatar } from '@/components/common/Avatar'
+import { ProfileLink } from '@/features/profile/components/ProfileLink'
 
 const SharedCanvasPanel = lazy(() => import('@/features/room/components/SharedCanvasPanel').then((m) => ({ default: m.SharedCanvasPanel })))
 
@@ -204,9 +206,18 @@ export default function InterviewDetailsPage() {
               <h2 className="text-sm font-semibold">Participants</h2>
               <ul className="mt-3 space-y-2 text-[13px]">
                 {d.participants.map((p) => (
-                  <li key={p.userId} className="flex justify-between gap-2">
-                    <span className="truncate">{p.userId === me.id ? 'You' : p.name}</span>
-                    <span className="text-fg-muted">{ROOM_ROLE_LABELS[p.role]}</span>
+                  <li key={p.userId} className="flex items-center justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Avatar label={p.name} src={p.avatarThumbUrl} size={24} />
+                      {p.userId === me.id ? (
+                        <span className="truncate">You</span>
+                      ) : (
+                        <ProfileLink username={p.username} className="truncate">
+                          {p.name}
+                        </ProfileLink>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-fg-muted">{ROOM_ROLE_LABELS[p.role]}</span>
                   </li>
                 ))}
               </ul>

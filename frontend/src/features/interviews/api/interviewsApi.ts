@@ -18,11 +18,11 @@ import type {
 
 export const interviewsApi = {
   /**
-   * GET /api/profile/{userId}/interviews — paginated history, newest first.
-   * (GET /api/interviews/user/{userId}/history is a stub that returns a plain string, so it is not used.)
+   * GET /api/profile/me/interviews — the signed-in user's history, newest first. `userId` only scopes
+   * the cache key. (GET /api/interviews/user/{userId}/history is a stub that returns a plain string.)
    */
-  async getHistory(userId: string, { status, type, page, limit }: InterviewHistoryFilters & PageParams) {
-    const { data } = await apiClient.get<SpringPage<InterviewHistoryItem>>(`/api/profile/${userId}/interviews`, {
+  async getHistory(_userId: string, { status, type, page, limit }: InterviewHistoryFilters & PageParams) {
+    const { data } = await apiClient.get<SpringPage<InterviewHistoryItem>>('/api/profile/me/interviews', {
       params: { status, type, page, limit },
     })
     return data

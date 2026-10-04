@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useAppSelector } from '@/app/hooks'
-import { selectCurrentUser } from '@/features/auth/slices/authSlice'
 import { profileApi } from '@/features/profile/api/profileApi'
 import type { ProfilePayload, UserProfile } from '@/features/profile/types'
+import { toApiError } from '@/lib/apiError'
 
 export const profileKeys = {
   all: ['profile'] as const,
   mine: () => [...profileKeys.all, 'me'] as const,
-  /** Everything keyed by a user id: rating, interview history, feedback. */
+  public: (username: string) => [...profileKeys.all, 'public', username.toLowerCase()] as const,
+  /** Everything keyed by a user id: rating, interview history. */
   user: (userId: string) => ['users', userId] as const,
   rating: (userId: string) => [...profileKeys.user(userId), 'rating'] as const,
 }
@@ -20,45 +20,80 @@ export function useMyProfile() {
   })
 }
 
-/** Rating is only available once the user has a profile, so callers pass `enabled`. */
-export function useUserRating(userId: string | undefined, enabled = true) {
+export function usePublicProfile(username: string | undefined) {
+  return useQuery({
+    queryKey: profileKeys.public(username ?? ''),
+    queryFn: () => profileApi.getPublic(username!),
+    enabled: Boolean(username),
+    // A missing username is a 404: show "not found" right away instead of retrying.
+    retry: (count, error) => count < 2 && (toApiError(error).status ?? 500) >= 500,
+  })
+}
+
+export function useUserRating(userId: string | undefined) {
   return useQuery({
     queryKey: profileKeys.rating(userId ?? ''),
     queryFn: () => profileApi.getRating(userId!),
-    enabled: Boolean(userId) && enabled,
+    enabled: Boolean(userId),
   })
 }
 
-export function useCreateProfile() {
+/** Keeps the cached profile in sync after a change; public profiles are refetched on next view. */
+function useProfileCache() {
   const queryClient = useQueryClient()
-  const user = useAppSelector(selectCurrentUser)
-  return useMutation({
-    mutationFn: (payload: ProfilePayload) => profileApi.create(payload),
-    onSuccess: (profile: UserProfile) => {
-      queryClient.setQueryData(profileKeys.mine(), profile)
-      // Rating, history and feedback become available once a profile exists.
-      if (user) queryClient.invalidateQueries({ queryKey: profileKeys.user(user.id) })
-    },
-  })
+  return {
+    patch: (changes: Partial<UserProfile>) =>
+      queryClient.setQueryData<UserProfile>(profileKeys.mine(), (current) => (current ? { ...current, ...changes } : current)),
+    set: (profile: UserProfile) => queryClient.setQueryData(profileKeys.mine(), profile),
+    invalidatePublic: () => queryClient.invalidateQueries({ queryKey: [...profileKeys.all, 'public'] }),
+  }
 }
 
 export function useUpdateProfile() {
-  const queryClient = useQueryClient()
+  const cache = useProfileCache()
   return useMutation({
     mutationFn: (payload: ProfilePayload) => profileApi.update(payload),
-    onSuccess: (profile) => queryClient.setQueryData(profileKeys.mine(), profile),
+    onSuccess: (profile) => {
+      cache.set(profile)
+      cache.invalidatePublic()
+    },
   })
 }
 
-export function useDeleteProfile() {
-  const queryClient = useQueryClient()
-  const user = useAppSelector(selectCurrentUser)
+export function useUploadAvatar() {
+  const cache = useProfileCache()
   return useMutation({
-    mutationFn: profileApi.remove,
-    onSuccess: () => {
-      // Profile-scoped endpoints now answer 404; drop their data instead of refetching it.
-      if (user) queryClient.removeQueries({ queryKey: profileKeys.user(user.id) })
-      queryClient.setQueryData(profileKeys.mine(), null)
+    mutationFn: profileApi.uploadAvatar,
+    onSuccess: (urls) => {
+      cache.patch(urls)
+      cache.invalidatePublic()
     },
+  })
+}
+
+export function useDeleteAvatar() {
+  const cache = useProfileCache()
+  return useMutation({
+    mutationFn: profileApi.deleteAvatar,
+    onSuccess: () => {
+      cache.patch({ avatar_url: null, avatar_thumb_url: null })
+      cache.invalidatePublic()
+    },
+  })
+}
+
+export function useUploadResume() {
+  const cache = useProfileCache()
+  return useMutation({
+    mutationFn: profileApi.uploadResume,
+    onSuccess: (resume) => cache.patch({ resume }),
+  })
+}
+
+export function useDeleteResume() {
+  const cache = useProfileCache()
+  return useMutation({
+    mutationFn: profileApi.deleteResume,
+    onSuccess: () => cache.patch({ resume: null }),
   })
 }

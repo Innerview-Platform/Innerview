@@ -14,6 +14,8 @@ export const paths = {
   interviewFeedback: (id: number | string) => `/interviews/${id}/feedback`,
   feedback: '/feedback',
   settings: '/settings/profile',
+  /** Public profile, by username. */
+  publicProfile: (username: string) => `/u/${encodeURIComponent(username)}`,
   join: '/join',
   /** Must match the links built by the backend: `${frontend.url}/abc-defg-hij` */
   room: (code: string) => `/${formatCode(code)}`,

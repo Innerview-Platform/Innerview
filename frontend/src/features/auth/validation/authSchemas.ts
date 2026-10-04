@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { companyRequiredWhenEmployed, requiredProfileFields } from '@/features/profile/validation/profileSchema'
 
 // Rules below mirror the backend DTO annotations — keep them in sync.
 
@@ -31,11 +32,13 @@ export const registerSchema = z
         'Password must contain at least one uppercase letter, one number, and one special character',
       ),
     password_confirmation: z.string().min(1, "Confirm password can't be empty"),
+    ...requiredProfileFields,
   })
   .refine((values) => values.password === values.password_confirmation, {
     path: ['password_confirmation'],
     message: "Password and confirmation don't match",
   })
+  .superRefine(companyRequiredWhenEmployed)
 export type RegisterFormValues = z.infer<typeof registerSchema>
 
 /** ForgetPasswordRequest */

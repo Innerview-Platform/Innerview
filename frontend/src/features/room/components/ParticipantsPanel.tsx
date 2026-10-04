@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeftRight, Crown, Lock, UserMinus, UserPlus, Users } from 'lucide-react'
+import { ArrowLeftRight, Crown, FileText, Lock, UserMinus, UserPlus, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar } from '@/components/common/Avatar'
 import { Badge } from '@/components/common/Badge'
 import { Button } from '@/components/common/Button'
 import { Select } from '@/components/forms/controls'
 import { ConfirmDialog } from '@/components/modals/ConfirmDialog'
+import { profileApi } from '@/features/profile/api/profileApi'
+import { ProfileLink } from '@/features/profile/components/ProfileLink'
+import { ResumePreviewModal } from '@/features/profile/components/ResumePreviewModal'
 import { roomApi } from '@/features/room/api/roomApi'
 import { InviteDialog } from '@/features/room/components/InviteDialog'
 import type { RoomRealtime } from '@/features/room/hooks/useRoomRealtime'
@@ -29,6 +32,7 @@ export function ParticipantsPanel({ realtime, currentUserId }: ParticipantsPanel
   const queryClient = useQueryClient()
   const [inviteOpen, setInviteOpen] = useState(false)
   const [removing, setRemoving] = useState<RoomParticipant | null>(null)
+  const [resumeOf, setResumeOf] = useState<RoomParticipant | null>(null)
 
   // ── lobby ────────────────────────────────────────────────────────────────
   const requestsKey = useMemo(() => ['rooms', code, 'requests'] as const, [code])
@@ -137,7 +141,7 @@ export function ParticipantsPanel({ realtime, currentUserId }: ParticipantsPanel
             return (
               <li key={p.userId} className="flex items-center gap-2.5 px-3 py-2.5">
                 <div className="relative">
-                  <Avatar label={p.name} size={32} />
+                  <Avatar label={p.name} src={p.avatarThumbUrl} size={32} />
                   <span
                     className={cn('absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-surface', p.status === 'CONNECTED' ? 'bg-success' : 'bg-warning animate-pulse')}
                     title={p.status === 'CONNECTED' ? 'Connected' : 'Reconnecting…'}
@@ -145,7 +149,13 @@ export function ParticipantsPanel({ realtime, currentUserId }: ParticipantsPanel
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-1.5 truncate text-sm">
-                    {isMe ? 'You' : p.name}
+                    {isMe ? (
+                      'You'
+                    ) : (
+                      <ProfileLink username={p.username} newTab className="truncate">
+                        {p.name}
+                      </ProfileLink>
+                    )}
                     {p.host && <Crown className="h-3.5 w-3.5 text-warning" aria-label="Host" />}
                   </p>
                   <p className="text-[11px] text-fg-muted">{p.status === 'RECONNECTING' ? 'Reconnecting…' : p.owner ? 'Created the interview' : ''}</p>
@@ -165,6 +175,17 @@ export function ParticipantsPanel({ realtime, currentUserId }: ParticipantsPanel
                   </Select>
                 ) : (
                   <Badge tone={p.role === 'INTERVIEWER' ? 'primary' : p.role === 'OBSERVER' ? 'neutral' : 'success'}>{ROOM_ROLE_LABELS[p.role]}</Badge>
+                )}
+                {me.staff && !isMe && p.role === 'INTERVIEWEE' && (
+                  <button
+                    type="button"
+                    className="rounded p-1 text-fg-muted hover:bg-elevated hover:text-fg"
+                    onClick={() => setResumeOf(p)}
+                    aria-label={`View ${p.name}'s resume`}
+                    title="View resume (available while the interview is running)"
+                  >
+                    <FileText className="h-4 w-4" />
+                  </button>
                 )}
                 {me.staff && !isMe && !p.owner && (
                   <button
@@ -215,6 +236,15 @@ export function ParticipantsPanel({ realtime, currentUserId }: ParticipantsPanel
         </div>
       )}
 
+      {resumeOf && (
+        <ResumePreviewModal
+          open
+          onClose={() => setResumeOf(null)}
+          title={`${resumeOf.name}'s resume`}
+          queryKey={['resume', room.interviewId, resumeOf.userId]}
+          load={() => profileApi.getParticipantResume(room.interviewId, resumeOf.userId)}
+        />
+      )}
       <InviteDialog open={inviteOpen} onClose={() => setInviteOpen(false)} interviewId={room.interviewId} code={code} />
       <ConfirmDialog
         open={Boolean(removing)}

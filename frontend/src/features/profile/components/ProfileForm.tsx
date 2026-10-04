@@ -1,18 +1,25 @@
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Avatar } from '@/components/common/Avatar'
 import { Button } from '@/components/common/Button'
 import { Alert } from '@/components/feedback/Alert'
 import { FormField } from '@/components/forms/FormField'
 import { Select, Textarea, TextInput } from '@/components/forms/controls'
-import { EXPERIENCE_LEVEL_LABELS, EXPERIENCE_LEVELS, INTERVIEW_ROLE_LABELS, INTERVIEW_ROLES } from '@/constants/enums'
+import {
+  EMPLOYMENT_STATUS_LABELS,
+  EMPLOYMENT_STATUSES,
+  EXPERIENCE_LEVEL_LABELS,
+  EXPERIENCE_LEVELS,
+  INTERVIEW_ROLE_LABELS,
+  INTERVIEW_ROLES,
+} from '@/constants/enums'
+import { UsernameField } from '@/features/profile/components/UsernameField'
+import { useUsernameAvailability } from '@/features/profile/hooks/useUsernameAvailability'
 import { profileSchema, type ProfileFormValues } from '@/features/profile/validation/profileSchema'
 import type { ProfilePayload, UserProfile } from '@/features/profile/types'
 import { getErrorMessage } from '@/lib/apiError'
 
 interface ProfileFormProps {
-  profile?: UserProfile | null
-  avatarLabel: string
+  profile: UserProfile
   submitLabel: string
   isSubmitting: boolean
   error: unknown
@@ -20,46 +27,98 @@ interface ProfileFormProps {
   onCancel?: () => void
 }
 
-function toFormValues(profile?: UserProfile | null): ProfileFormValues {
+const TIME_ZONES: string[] = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []
+
+function toFormValues(profile: UserProfile): ProfileFormValues {
   return {
-    experience_level: profile?.experience_level ?? '',
-    preferred_role: profile?.preferred_role ?? '',
-    bio: profile?.bio ?? '',
-    image_url: profile?.image_url ?? '',
+    username: profile.username ?? '',
+    name: profile.name ?? '',
+    // The select starts empty for accounts that have never set it; validation then asks for it.
+    employment_status: (profile.employment_status ?? '') as ProfileFormValues['employment_status'],
+    company: profile.company ?? '',
+    university: profile.university ?? '',
+    college: profile.college ?? '',
+    headline: profile.headline ?? '',
+    experience_level: profile.experience_level ?? '',
+    preferred_role: profile.preferred_role ?? '',
+    bio: profile.bio ?? '',
+    location: profile.location ?? '',
+    timezone: profile.timezone ?? '',
+    linkedin_url: profile.linkedin_url ?? '',
+    github_url: profile.github_url ?? '',
+    portfolio_url: profile.portfolio_url ?? '',
+    show_email: profile.show_email,
   }
 }
 
-export function ProfileForm({ profile, avatarLabel, submitLabel, isSubmitting, error, onSubmit, onCancel }: ProfileFormProps) {
-  const isEditing = Boolean(profile)
+export function ProfileForm({ profile, submitLabel, isSubmitting, error, onSubmit, onCancel }: ProfileFormProps) {
   const {
     register,
     handleSubmit,
     control,
     reset,
+    setError,
     formState: { errors, isDirty },
   } = useForm<ProfileFormValues>({ resolver: zodResolver(profileSchema), defaultValues: toFormValues(profile) })
-  const imageUrl = useWatch({ control, name: 'image_url' })
+  const employmentStatus = useWatch({ control, name: 'employment_status' })
+  const usernameStatus = useUsernameAvailability(useWatch({ control, name: 'username' }), profile.username)
 
-  const submit = handleSubmit((values) =>
+  const submit = handleSubmit((values) => {
+    if (usernameStatus.state === 'taken') {
+      setError('username', { message: usernameStatus.message }, { shouldFocus: true })
+      return
+    }
     onSubmit({
-      // The backend ignores nulls on update, so an unset select keeps its stored value.
+      ...values,
+      company: values.employment_status === 'EMPLOYED' ? values.company : '',
+      // The backend ignores nulls, so an unset select keeps its stored value.
       experience_level: values.experience_level || null,
       preferred_role: values.preferred_role || null,
-      // Empty strings are persisted, which is how text fields are cleared.
-      bio: values.bio.trim(),
-      image_url: values.image_url.trim(),
-    }),
-  )
+    })
+  })
 
   // Enum fields cannot be cleared once stored (PUT ignores null), so only offer "Not specified" when unset.
-  const allowEmptyExperience = !isEditing || !profile?.experience_level
-  const allowEmptyRole = !isEditing || !profile?.preferred_role
+  const allowEmptyExperience = !profile.experience_level
+  const allowEmptyRole = !profile.preferred_role
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-5" noValidate>
       {error != null && <Alert tone="danger">{getErrorMessage(error)}</Alert>}
 
       <div className="grid gap-5 sm:grid-cols-2">
+        <UsernameField registration={register('username')} status={usernameStatus} error={errors.username?.message} />
+        <FormField label="Full name" error={errors.name?.message}>
+          {(field) => <TextInput {...field} autoComplete="name" {...register('name')} />}
+        </FormField>
+        <FormField label="Headline" optional className="sm:col-span-2" error={errors.headline?.message}>
+          {(field) => <TextInput {...field} placeholder="Backend Engineer" {...register('headline')} />}
+        </FormField>
+
+        <FormField label="Employment" error={errors.employment_status?.message}>
+          {(field) => (
+            <Select {...field} {...register('employment_status')}>
+              {!profile.employment_status && <option value="">Select…</option>}
+              {EMPLOYMENT_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {EMPLOYMENT_STATUS_LABELS[status]}
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
+        {employmentStatus === 'EMPLOYED' && (
+          <FormField label="Company" error={errors.company?.message}>
+            {(field) => <TextInput {...field} autoComplete="organization" {...register('company')} />}
+          </FormField>
+        )}
+
+        <FormField label="University" error={errors.university?.message}>
+          {(field) => <TextInput {...field} placeholder="Cairo University" {...register('university')} />}
+        </FormField>
+        <FormField label="College" error={errors.college?.message}>
+          {(field) => <TextInput {...field} placeholder="Faculty of Engineering" {...register('college')} />}
+        </FormField>
+
         <FormField label="Experience level" error={errors.experience_level?.message}>
           {(field) => (
             <Select {...field} {...register('experience_level')}>
@@ -72,7 +131,6 @@ export function ProfileForm({ profile, avatarLabel, submitLabel, isSubmitting, e
             </Select>
           )}
         </FormField>
-
         <FormField label="Preferred interview role" error={errors.preferred_role?.message}>
           {(field) => (
             <Select {...field} {...register('preferred_role')}>
@@ -85,18 +143,47 @@ export function ProfileForm({ profile, avatarLabel, submitLabel, isSubmitting, e
             </Select>
           )}
         </FormField>
+
+        <FormField label="Location" optional error={errors.location?.message}>
+          {(field) => <TextInput {...field} placeholder="Cairo, Egypt" {...register('location')} />}
+        </FormField>
+        <FormField label="Time zone" optional error={errors.timezone?.message}>
+          {(field) => (
+            <Select {...field} {...register('timezone')}>
+              <option value="">Not specified</option>
+              {TIME_ZONES.map((zone) => (
+                <option key={zone} value={zone}>
+                  {zone.replaceAll('_', ' ')}
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
       </div>
 
       <FormField label="Bio" optional error={errors.bio?.message} hint="What are you preparing for? Share your focus areas.">
         {(field) => <Textarea {...field} rows={4} placeholder="Backend engineer preparing for system design rounds…" {...register('bio')} />}
       </FormField>
 
-      <div className="flex items-start gap-4">
-        <Avatar label={avatarLabel} src={errors.image_url ? null : imageUrl} size={44} className="mt-7" />
-        <FormField label="Profile photo URL" optional className="flex-1" error={errors.image_url?.message}>
-          {(field) => <TextInput {...field} type="url" inputMode="url" placeholder="https://…" {...register('image_url')} />}
+      <div className="grid gap-5 sm:grid-cols-3">
+        <FormField label="LinkedIn" optional error={errors.linkedin_url?.message}>
+          {(field) => <TextInput {...field} inputMode="url" placeholder="linkedin.com/in/you" {...register('linkedin_url')} />}
+        </FormField>
+        <FormField label="GitHub" optional error={errors.github_url?.message}>
+          {(field) => <TextInput {...field} inputMode="url" placeholder="github.com/you" {...register('github_url')} />}
+        </FormField>
+        <FormField label="Portfolio" optional error={errors.portfolio_url?.message}>
+          {(field) => <TextInput {...field} inputMode="url" placeholder="you.dev" {...register('portfolio_url')} />}
         </FormField>
       </div>
+
+      <label className="flex items-start gap-3 text-sm">
+        <input type="checkbox" className="mt-0.5 h-4 w-4 accent-primary" {...register('show_email')} />
+        <span>
+          <span className="font-medium">Show my email on my public profile</span>
+          <span className="block text-fg-muted">Other signed-in users will see {profile.email}.</span>
+        </span>
+      </label>
 
       <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-5">
         {onCancel && (
@@ -104,12 +191,10 @@ export function ProfileForm({ profile, avatarLabel, submitLabel, isSubmitting, e
             Cancel
           </Button>
         )}
-        {isEditing && (
-          <Button variant="secondary" onClick={() => reset(toFormValues(profile))} disabled={!isDirty || isSubmitting}>
-            Reset
-          </Button>
-        )}
-        <Button type="submit" loading={isSubmitting} disabled={isEditing && !isDirty}>
+        <Button variant="secondary" onClick={() => reset(toFormValues(profile))} disabled={!isDirty || isSubmitting}>
+          Reset
+        </Button>
+        <Button type="submit" loading={isSubmitting} disabled={profile.profile_complete && !isDirty}>
           {submitLabel}
         </Button>
       </div>

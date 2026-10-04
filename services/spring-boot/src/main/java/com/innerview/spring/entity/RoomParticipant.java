@@ -13,6 +13,9 @@ import lombok.Data;
 public class RoomParticipant {
   private UUID userId;
   private String name;
+  /** Null for accounts without a username yet. */
+  private String username;
+  private String avatarThumbUrl;
   private InterviewRole role;
   private volatile RoomParticipantStatus status = RoomParticipantStatus.LEFT;
   /** First time they entered this room. */

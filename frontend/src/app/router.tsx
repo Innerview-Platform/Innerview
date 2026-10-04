@@ -20,6 +20,7 @@ const InterviewDetailsPage = lazy(() => import('@/features/interviews/pages/Inte
 const InterviewFeedbackPage = lazy(() => import('@/features/feedback/pages/InterviewFeedbackPage'))
 const FeedbackPage = lazy(() => import('@/features/feedback/pages/FeedbackPage'))
 const ProfilePage = lazy(() => import('@/features/profile/pages/ProfilePage'))
+const PublicProfilePage = lazy(() => import('@/features/profile/pages/PublicProfilePage'))
 const JoinRoomPage = lazy(() => import('@/features/room/pages/JoinRoomPage'))
 const RoomPage = lazy(() => import('@/features/room/pages/RoomPage'))
 
@@ -74,6 +75,7 @@ export const router = createBrowserRouter([
               { path: '/interviews/:interviewId/feedback', element: <InterviewFeedbackPage /> },
               { path: paths.feedback, element: <FeedbackPage /> },
               { path: paths.settings, element: <ProfilePage /> },
+              { path: '/u/:username', element: <PublicProfilePage /> },
               { path: paths.join, element: <JoinRoomPage /> },
             ],
           },

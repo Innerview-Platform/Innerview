@@ -16,7 +16,9 @@ export function injectStore(appStore: AuthAwareStore) {
 
 export const apiClient = axios.create({
   baseURL: config.apiBaseUrl,
-  headers: { 'Content-Type': 'application/json' },
+  // No default Content-Type: axios sends plain objects as JSON on its own, and leaving it unset lets
+  // FormData uploads go out as multipart with the browser's boundary. (A JSON default makes axios
+  // serialize FormData to JSON, which the backend rejects with 415.)
   // The httpOnly refresh_token cookie (Path=/api/auth) must accompany refresh and logout.
   withCredentials: true,
   timeout: 20_000,

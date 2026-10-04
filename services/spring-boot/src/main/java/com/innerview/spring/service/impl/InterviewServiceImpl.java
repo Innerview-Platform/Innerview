@@ -71,6 +71,7 @@ public class InterviewServiceImpl implements InterviewService {
   private final UserInterviewRepository userInterviewRepository;
   private final InterviewInviteRepository inviteRepository;
   private final InterviewMessageRepository messageRepository;
+  private final AvatarLookup avatarLookup;
   private final InviteService inviteService;
   private final RoomService roomService;
 
@@ -279,8 +280,12 @@ public class InterviewServiceImpl implements InterviewService {
     boolean staff = owner || myRole == InterviewRole.INTERVIEWER;
     boolean ended = interview.getStatus() == InterviewStatus.COMPLETED;
 
-    List<InterviewDetailsDto.Person> people = userInterviewRepository.findByIdInterviewId(interviewId).stream()
-        .map(ui -> new InterviewDetailsDto.Person(ui.getId().getUserId(), ui.getUser().getName(), ui.getRole().name()))
+    List<UserInterview> participations = userInterviewRepository.findByIdInterviewId(interviewId);
+    Map<UUID, String> avatars = avatarLookup.thumbnails(participations.stream().map(ui -> ui.getId().getUserId()).toList());
+    List<InterviewDetailsDto.Person> people = participations.stream()
+        .map(ui -> new InterviewDetailsDto.Person(
+            ui.getId().getUserId(), ui.getUser().getName(), ui.getUser().getUsername(),
+            avatars.get(ui.getId().getUserId()), ui.getRole().name()))
         .toList();
     List<ChatMessageDto> chat = ended && participation.isPresent() || ended && owner
         ? messageRepository.findByInterviewIdOrderBySentAtAsc(interviewId).stream()

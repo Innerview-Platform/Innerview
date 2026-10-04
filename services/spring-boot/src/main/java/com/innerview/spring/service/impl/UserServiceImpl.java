@@ -16,6 +16,7 @@ import com.innerview.spring.repository.UserRepository;
 import com.innerview.spring.service.EmailExitanceService;
 import com.innerview.spring.service.NotificationPublisherService;
 import com.innerview.spring.service.RefreshTokenService;
+import com.innerview.spring.service.UserProfileService;
 import com.innerview.spring.service.UserService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -30,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
@@ -42,11 +44,14 @@ public class UserServiceImpl implements UserService {
   private final EmailService emailService;
   private final EmailExitanceService emailExitanceService;
   private final NotificationPublisherService notificationPublisherService;
+  private final UserProfileService userProfileService;
+  private final UsernameService usernameService;
 
   @Value("${frontend.url}")
   private String frontendUrl;
 
   @Override
+  @Transactional
   public RegisterResponse createUser(RegisterRequest registerDTO) {
     // check if the the password and confirmation password match each other
     if (!registerDTO.getPassword().equals(registerDTO.getPasswordConfirmation())) {
@@ -70,8 +75,18 @@ public class UserServiceImpl implements UserService {
             .passwordHash(passwordEncoder.encode(registerDTO.getPassword()))
             .forgotPasswordCount(0)
             .build();
+    usernameService.assign(user, registerDTO.getUsername());
 
-    User savedUser = userRepository.save(user);
+    User savedUser;
+    try {
+      savedUser = userRepository.saveAndFlush(user);
+    } catch (DataIntegrityViolationException e) {
+      // Someone claimed the same username (or email) between the check and the insert.
+      if (userRepository.existsByUsername(user.getUsername())) throw UsernameService.taken();
+      throw e;
+    }
+    // Same transaction: an invalid profile (e.g. employed without a company) creates no account.
+    userProfileService.createInitialProfile(savedUser, registerDTO);
 
     sendWelcomeNotification(savedUser);
 
