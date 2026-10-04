@@ -1,5 +1,4 @@
 *.sh
-!scripts/*.sh
 qodana.yaml
 HELP.md
 target/

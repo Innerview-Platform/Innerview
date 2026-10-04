@@ -1,16 +1,52 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { CaptureUpdateAction, Excalidraw, reconcileElements } from '@excalidraw/excalidraw'
-import type { BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
-import type { RemoteExcalidrawElement } from '@excalidraw/excalidraw/data/reconcile'
-import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types'
-import '@excalidraw/excalidraw/index.css'
+import { useCallback, useMemo, type ReactNode } from 'react'
+import { useSync } from '@tldraw/sync'
+import {
+  AssetRecordType,
+  getHashForString,
+  Tldraw,
+  uniqueId,
+  useTldrawCurrentUser,
+  type Editor,
+  type TLAssetStore,
+  type TLBookmarkAsset,
+} from 'tldraw'
+import 'tldraw/tldraw.css'
 import { AlertTriangle } from 'lucide-react'
 import { Spinner } from '@/components/common/Spinner'
-import { getCanvasUrl } from '@/constants/config'
+import { config, getCanvasUrl } from '@/constants/config'
 import type { RoomRealtime } from '@/features/room/hooks/useRoomRealtime'
+import { presenceColor } from '@/features/room/utils/presence'
 
-type Scene = { elements: readonly ExcalidrawElement[]; files: BinaryFiles }
-type CanvasStatus = 'connecting' | 'live' | 'reconnecting' | 'error'
+/** Uploads go to the sync server; the stored src is relative so it works on any origin. */
+function createAssetStore(getTicket: () => Promise<string>): TLAssetStore {
+  return {
+    async upload(_asset, file) {
+      const id = `${uniqueId()}-${file.name}`.replace(/[^A-Za-z0-9._-]/g, '-').slice(0, 200)
+      const response = await fetch(getCanvasUrl(`/uploads/${encodeURIComponent(id)}`), {
+        method: 'PUT',
+        body: file,
+        headers: { Authorization: `Bearer ${await getTicket()}`, 'Content-Type': file.type },
+      })
+      if (!response.ok) throw new Error(`Upload failed (${response.status})`)
+      return { src: `${config.canvasBaseUrl}/uploads/${encodeURIComponent(id)}` }
+    },
+    resolve: (asset) => asset.props.src,
+  }
+}
+
+/**
+ * Pasted links become plain bookmark cards. Link previews are deliberately not fetched: that would
+ * mean either calling tldraw's hosted service or letting our server fetch arbitrary URLs.
+ */
+async function createBookmark({ url }: { url: string }): Promise<TLBookmarkAsset> {
+  return {
+    id: AssetRecordType.createId(getHashForString(url)),
+    typeName: 'asset',
+    type: 'bookmark',
+    meta: {},
+    props: { src: url, title: url, description: '', image: '', favicon: '' },
+  }
+}
 
 function CanvasMessage({ children, tone = 'muted' }: { children: ReactNode; tone?: 'muted' | 'danger' }) {
   return (
@@ -26,117 +62,40 @@ interface SharedCanvasPanelProps {
   roomId: string
   /** Fresh room ticket (read-only tickets give a view-only board, e.g. on the interview summary). */
   fetchTicket: RoomRealtime['fetchTicket']
+  user: { id: string; name: string }
   /** Rendered at the left of the panel's header (the workspace tabs). */
   header?: ReactNode
   className?: string
-  readOnly?: boolean
 }
 
-/** System-design whiteboard shared by everyone in the room, synced through the self-hosted Excalidraw server. */
-export function SharedCanvasPanel({ roomId, fetchTicket, header, className, readOnly = false }: SharedCanvasPanelProps) {
-  const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null)
-  const [status, setStatus] = useState<CanvasStatus>('connecting')
-  const socketRef = useRef<WebSocket | null>(null)
-  const applyingRemote = useRef(false)
-  const pendingScene = useRef<Scene | null>(null)
-  const sendTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+/** System-design whiteboard shared by everyone in the room, synced through the self-hosted tldraw server. */
+export function SharedCanvasPanel({ roomId, fetchTicket, user: me, header, className }: SharedCanvasPanelProps) {
+  // useSync reconnects whenever its options change identity, so both must be stable.
+  const assets = useMemo(() => createAssetStore(fetchTicket), [fetchTicket])
+  const uri = useCallback(
+    // Resolved on every (re)connect with a fresh room ticket.
+    async () => `${getCanvasUrl(`/connect/${encodeURIComponent(roomId)}`, { ws: true })}?token=${encodeURIComponent(await fetchTicket())}`,
+    [roomId, fetchTicket],
+  )
+  const store = useSync({ uri, assets })
 
-  const applyScene = useCallback((scene: Scene) => {
-    if (!api) {
-      pendingScene.current = scene
-      return
-    }
-    applyingRemote.current = true
-    // Replies can describe an older scene than the one currently being drawn.
-    // Reconcile keeps unsent/newer local strokes, deletion tombstones, and active edits.
-    const elements = reconcileElements(
-      api.getSceneElementsIncludingDeleted(),
-      scene.elements as readonly RemoteExcalidrawElement[],
-      api.getAppState(),
-    )
-    api.updateScene({ elements, captureUpdate: CaptureUpdateAction.NEVER })
-    api.addFiles(Object.values(scene.files))
-    queueMicrotask(() => { applyingRemote.current = false })
-  }, [api])
+  const userPreferences = useMemo(
+    () => ({ id: me.id, name: me.name, color: presenceColor(me.id), colorScheme: 'dark' as const }),
+    [me.id, me.name],
+  )
+  const user = useTldrawCurrentUser({ userPreferences })
 
-  useEffect(() => {
-    if (!api || !pendingScene.current) return
-    const scene = pendingScene.current
-    pendingScene.current = null
-    applyScene(scene)
-  }, [api, applyScene])
+  const onMount = (editor: Editor) => {
+    editor.registerExternalAssetHandler('url', createBookmark)
+  }
 
-  useEffect(() => {
-    let stopped = false
-    let retryTimer: ReturnType<typeof setTimeout> | undefined
-    let retryDelay = 500
-    let socket: WebSocket | null = null
-
-    const connect = async () => {
-      try {
-        const ticket = await fetchTicket()
-        if (stopped) return
-        const url = new URL(getCanvasUrl(`/connect/${encodeURIComponent(roomId)}`, { ws: true }))
-        url.searchParams.set('token', ticket)
-        socket = new WebSocket(url)
-        socketRef.current = socket
-        socket.onopen = () => setStatus(retryDelay > 500 ? 'reconnecting' : 'connecting')
-        socket.onmessage = (event) => {
-          let message: { type?: string; scene?: Scene }
-          try { message = JSON.parse(event.data as string) as typeof message } catch { return }
-          if (message.type !== 'scene' || !message.scene) return
-          applyScene(message.scene)
-          setStatus('live')
-          retryDelay = 500
-        }
-        socket.onerror = () => socket?.close()
-        socket.onclose = () => {
-          if (socketRef.current === socket) socketRef.current = null
-          if (stopped) return
-          setStatus('reconnecting')
-          retryTimer = setTimeout(connect, retryDelay)
-          retryDelay = Math.min(retryDelay * 2, 10_000)
-        }
-      } catch {
-        if (!stopped) {
-          setStatus('error')
-          retryTimer = setTimeout(connect, retryDelay)
-          retryDelay = Math.min(retryDelay * 2, 10_000)
-        }
-      }
-    }
-
-    void connect()
-    return () => {
-      stopped = true
-      if (retryTimer) clearTimeout(retryTimer)
-      if (socketRef.current === socket) socketRef.current = null
-      socket?.close()
-      if (sendTimer.current) clearTimeout(sendTimer.current)
-    }
-  }, [roomId, fetchTicket, applyScene])
-
-  const onChange = useCallback((elements: readonly ExcalidrawElement[], _appState: unknown, files: BinaryFiles) => {
-    if (readOnly || applyingRemote.current) return
-    if (sendTimer.current) clearTimeout(sendTimer.current)
-    sendTimer.current = setTimeout(() => {
-      const socket = socketRef.current
-      if (socket?.readyState === WebSocket.OPEN) {
-        // Read at send time: a remote merge may have happened during the debounce.
-        socket.send(JSON.stringify({ type: 'scene', scene: {
-          elements: api?.getSceneElementsIncludingDeleted() ?? elements,
-          files: api?.getFiles() ?? files,
-        } }))
-      }
-    }, 120)
-  }, [readOnly, api])
-
-  const statusView = status === 'live'
-    ? { label: 'Live', dot: 'bg-success' }
-    : status === 'error'
-      ? { label: 'Disconnected', dot: 'bg-danger' }
-      : status === 'reconnecting'
-        ? { label: 'Reconnecting…', dot: 'bg-warning animate-pulse' }
+  const status =
+    store.status === 'synced-remote'
+      ? store.connectionStatus === 'online'
+        ? { label: 'Live', dot: 'bg-success' }
+        : { label: 'Reconnecting…', dot: 'bg-warning animate-pulse' }
+      : store.status === 'error'
+        ? { label: 'Disconnected', dot: 'bg-danger' }
         : { label: 'Connecting…', dot: 'bg-warning animate-pulse' }
 
   return (
@@ -144,23 +103,31 @@ export function SharedCanvasPanel({ roomId, fetchTicket, header, className, read
       <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border px-2">
         {header}
         <span className="flex items-center gap-2 px-2 text-xs text-fg-muted" role="status">
-          <span className={`h-2 w-2 rounded-full ${statusView.dot}`} aria-hidden />
-          {statusView.label}
+          <span className={`h-2 w-2 rounded-full ${status.dot}`} aria-hidden />
+          {status.label}
         </span>
       </div>
       <div className="relative min-h-0 flex-1">
-        {status === 'error' && <CanvasMessage tone="danger">The whiteboard server can't be reached. Reconnecting…</CanvasMessage>}
-        <div className="absolute inset-0">
-          <Excalidraw
-            excalidrawAPI={setApi}
-            onChange={onChange}
-            isCollaborating
-            viewModeEnabled={readOnly}
-            theme="dark"
-            name="InnerView whiteboard"
-            autoFocus={false}
-          />
-        </div>
+        {store.status === 'loading' && <CanvasMessage>Loading the whiteboard…</CanvasMessage>}
+        {store.status === 'error' && (
+          <CanvasMessage tone="danger">
+            {/NOT_AUTHENTICATED|FORBIDDEN/i.test(store.error.message)
+              ? "You don't have access to this whiteboard anymore."
+              : "The whiteboard server can't be reached. Make sure it is running, then reload the page."}
+          </CanvasMessage>
+        )}
+        {store.status === 'synced-remote' && (
+          <div className="absolute inset-0">
+            <Tldraw
+              store={store}
+              user={user}
+              colorScheme="dark"
+              onMount={onMount}
+              autoFocus={false}
+              licenseKey={import.meta.env.VITE_TLDRAW_LICENSE_KEY}
+            />
+          </div>
+        )}
       </div>
     </section>
   )

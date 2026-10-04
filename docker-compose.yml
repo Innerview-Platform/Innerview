@@ -1,9 +1,3 @@
-# Local development: `docker compose up -d --build` (or `make dev`, see Makefile).
-# Production (VPS):   also load docker-compose.prod.yml; see docs/DEPLOYMENT.md.
-#
-# Host ports are bound to 127.0.0.1 so databases, Piston and the internal services are never
-# reachable from other machines (Docker's port publishing bypasses host firewalls such as ufw).
-# Only LiveKit's media ports (7881/tcp, 7882/udp) are public.
 services:
   # ── Frontend (React + nginx reverse proxy) ──────
   frontend:
@@ -12,9 +6,10 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_LIVEKIT_URL: ${VITE_LIVEKIT_URL:-ws://localhost:7880}
+        VITE_TLDRAW_LICENSE_KEY: ${VITE_TLDRAW_LICENSE_KEY:-}
     container_name: innerview-frontend
     ports:
-      - "127.0.0.1:${FRONTEND_PORT:-3000}:80"
+      - "${FRONTEND_PORT:-3000}:80"
     depends_on:
       backend:
         condition: service_healthy
@@ -33,7 +28,7 @@ services:
       dockerfile: Dockerfile
     container_name: innerview-backend
     ports:
-      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
+      - "${BACKEND_PORT:-8080}:8080"
     environment:
       # Database
       DB_URL: jdbc:mysql://mysql:3306/innerview?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
@@ -101,7 +96,7 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD:-innerview_pass}
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_pass}
     ports:
-      - "127.0.0.1:${DB_PORT:-3306}:3306"
+      - "${DB_PORT:-3306}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
@@ -120,7 +115,7 @@ services:
     container_name: innerview-redis
     command: redis-server --save 60 1 --loglevel warning
     ports:
-      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -138,27 +133,24 @@ services:
     container_name: innerview-dynamodb
     command: "-jar DynamoDBLocal.jar -sharedDb -inMemory"
     ports:
-      - "127.0.0.1:${DYNAMODB_PORT:-8000}:8000"
+      - "${DYNAMODB_PORT:-8000}:8000"
     restart: unless-stopped
     networks:
       - innerview-network
 
-  # ── Shared whiteboard (self-hosted Excalidraw sync server) ──
+  # ── Shared whiteboard (self-hosted tldraw sync server) ──
   # services/nodejs/collaboration-canvas — the frontend's nginx proxies /canvas/* here.
   canvas:
     build:
       context: ./services/nodejs/collaboration-canvas
     container_name: innerview-canvas
     ports:
-      - "127.0.0.1:${CANVAS_PORT:-5858}:5858"
+      - "${CANVAS_PORT:-5858}:5858"
     environment:
       JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-for-dev-only-change-in-production}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      CANVAS_REDIS_URL: redis://redis:6379
-      CANVAS_RETENTION_DAYS: ${CANVAS_RETENTION_DAYS:-180}
-    depends_on:
-      redis:
-        condition: service_healthy
+    volumes:
+      - canvas-data:/data
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:5858/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
       interval: 30s
@@ -175,7 +167,7 @@ services:
       context: ./services/nodejs/collaboration-editor
     container_name: innerview-editor
     ports:
-      - "127.0.0.1:${EDITOR_PORT:-1234}:1234"
+      - "${EDITOR_PORT:-1234}:1234"
     environment:
       JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-for-dev-only-change-in-production}
       BACKEND_INTERNAL_URL: http://backend:8080
@@ -194,7 +186,7 @@ services:
     container_name: innerview-piston
     privileged: true
     ports:
-      - "127.0.0.1:${PISTON_PORT:-2000}:2000"
+      - "${PISTON_PORT:-2000}:2000"
     environment:
       # Interactive runs wait on user input, so allow up to 5 minutes of wall time per run.
       # CPU time stays low, which still stops busy loops quickly.
@@ -215,7 +207,7 @@ services:
     container_name: innerview-livekit
     command: --dev --bind 0.0.0.0
     ports:
-      - "127.0.0.1:7880:7880"
+      - "7880:7880"
       - "7881:7881"
       - "7882:7882/udp"
     restart: unless-stopped
@@ -226,6 +218,7 @@ volumes:
   mysql-data:
   redis-data:
   piston-packages:
+  canvas-data:
   editor-data:
 
 networks:

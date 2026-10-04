@@ -639,7 +639,7 @@ pnpm build
 
 To provide complete technical transparency for contributors and evaluators, the following architectural details reflect the current codebase implementation:
 
-1. **System Design Canvas**: The `SYSTEM_DESIGN` interview type toggles `showSystemCanvas` in `RoomUiConfig` and opens the shared Excalidraw whiteboard.
+1. **System Design Canvas**: The `SYSTEM_DESIGN` interview type toggles `showSystemCanvas` in `RoomUiConfig`. The whiteboard rendering component is stubbed awaiting full `tldraw` integration.
 2. **Code Execution Sandbox**: The `COMPILE_CODE` STOMP signal flushes collaborative code changes to Redis and logs the event to the server. Integration with an isolated remote execution engine (e.g. Judge0 or Piston) is planned for future iterations.
 3. **LiveKit Video SFU**: Video streaming utilizes the LiveKit WebRTC client. A LiveKit server running in development mode is bundled directly into `docker-compose.yml` (`ws://localhost:7880`), enabling video/audio calls out of the box. For standalone local frontend dev (`pnpm dev`), ensure LiveKit is running locally or via Docker (`docker compose up livekit -d`).
 4. **Email Dispatch**: Sending password reset emails requires valid Gmail SMTP app credentials in `.env`. If credentials are omitted, the backend handles the request without failing, but email delivery is bypassed.

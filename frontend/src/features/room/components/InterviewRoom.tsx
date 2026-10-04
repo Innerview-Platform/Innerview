@@ -27,7 +27,7 @@ import { getErrorMessage } from '@/lib/apiError'
 import { cn } from '@/lib/utils'
 import { paths } from '@/routes/paths'
 
-// Heavy dependencies (CodeMirror, Excalidraw, LiveKit) load only inside the room.
+// Heavy dependencies (CodeMirror, tldraw, LiveKit) load only inside the room.
 const ProblemPanel = lazy(() => import('@/features/room/components/ProblemPanel').then((m) => ({ default: m.ProblemPanel })))
 const CodeEditorPanel = lazy(() => import('@/features/room/components/CodeEditorPanel').then((m) => ({ default: m.CodeEditorPanel })))
 const SharedCanvasPanel = lazy(() => import('@/features/room/components/SharedCanvasPanel').then((m) => ({ default: m.SharedCanvasPanel })))
@@ -241,7 +241,7 @@ export function InterviewRoom({ joined, devices, takeover, onRejoin }: Interview
       {whiteboardMounted && (
         <div className={cn('h-full', activeTab !== 'whiteboard' && 'hidden')}>
           <Suspense fallback={<PanelFallback className="h-full" />}>
-            <SharedCanvasPanel roomId={code} fetchTicket={realtime.fetchTicket} header={tabs} />
+            <SharedCanvasPanel roomId={code} fetchTicket={realtime.fetchTicket} user={user} header={tabs} />
           </Suspense>
         </div>
       )}

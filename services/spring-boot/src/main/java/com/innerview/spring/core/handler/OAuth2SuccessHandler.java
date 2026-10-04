@@ -84,7 +84,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         "Set-Cookie",
         org.springframework.http.ResponseCookie.from("refresh_token", refreshToken)
             .httpOnly(true)
-            .secure(frontendUrl.startsWith("https://"))
+            .secure(false)
             .path("/api/auth")
             .maxAge(refreshTokenExpiry / 1000)
             .sameSite("Lax")

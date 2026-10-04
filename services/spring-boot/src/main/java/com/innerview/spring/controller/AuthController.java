@@ -3,7 +3,6 @@ package com.innerview.spring.controller;
 import java.util.LinkedHashMap;
 import com.innerview.spring.exception.InvalidRefreshTokenException;
 import com.innerview.spring.exception.RefreshTokenExpiredException;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -46,9 +45,6 @@ public class AuthController {
 	final UserService userService;
 	private final RefreshTokenService tokenService;
 	private final JwtUtil jwtUtil;
-
-	@Value("${frontend.url}")
-	private String frontendUrl;
 
 	@PostMapping("/login")
 	public ResponseEntity<?> loginUser(@RequestBody @Valid LoginRequest loginRequest) {
@@ -114,11 +110,11 @@ public class AuthController {
 	static final String REFRESH_COOKIE = "refresh_token";
 	static final long REFRESH_COOKIE_MAX_AGE = 7L * 24 * 60 * 60;
 
-	/** The refresh token cookie: httpOnly, only sent to /api/auth, same-site only, HTTPS-only when the app is served over HTTPS. */
-	ResponseCookie refreshCookie(String value, long maxAgeSeconds) {
+	/** The refresh token cookie: httpOnly, only sent to /api/auth, same-site only. */
+	static ResponseCookie refreshCookie(String value, long maxAgeSeconds) {
 		return ResponseCookie.from(REFRESH_COOKIE, value)
 				.httpOnly(true)
-				.secure(frontendUrl.startsWith("https://"))
+				.secure(false)
 				.path("/api/auth")
 				.maxAge(maxAgeSeconds)
 				.sameSite("Lax")
