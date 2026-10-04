@@ -1,8 +1,7 @@
 package com.innerview.spring.core.config;
 
-import com.innerview.spring.core.util.JwtUtil;
 import com.innerview.spring.service.RoomService;
-import java.util.UUID;
+import java.security.Principal;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.Message;
@@ -17,68 +16,85 @@ import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
 
+/**
+ * STOMP over WebSocket for interview rooms.
+ *
+ * <ul>
+ *   <li>CONNECT must carry a room ticket (header {@code ticket}, from POST /api/rooms/{code}/join or
+ *       /ticket); the session is bound to that user and room. Optional headers: {@code clientId}
+ *       (per tab) and {@code takeover: true} ("Join here" from a second tab).
+ *   <li>SUBSCRIBE is limited to the session's own room topics and the user's private queues.
+ *   <li>Private queues: {@code /user/queue/lobby}, {@code /user/queue/session}, {@code /user/queue/errors}.
+ * </ul>
+ */
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
-    private final JwtUtil jwtUtil;
-    private final RoomService roomService;
 
-    public WebSocketConfig(JwtUtil jwtUtil,@Lazy RoomService roomService) {
-        this.jwtUtil = jwtUtil;
-        this.roomService = roomService;
-    }
+  private final RoomService roomService;
 
-    @Override
-    public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // This is the HTTP endpoint your React frontend will hit to open the WebSocket
-        registry
-                .addEndpoint("/ws-signal")
-                .setAllowedOriginPatterns("*") // Prevents CORS errors from your frontend
-                .withSockJS(); // Optional fallback for older browsers
-    }
+  public WebSocketConfig(@Lazy RoomService roomService) {
+    this.roomService = roomService;
+  }
 
-    @Override
-    public void configureMessageBroker(MessageBrokerRegistry registry) {
-        // This is the prefix for messages the SERVER broadcasts to the frontend (e.g., /topic/room/123)
-        registry.enableSimpleBroker("/topic");
+  @Override
+  public void registerStompEndpoints(StompEndpointRegistry registry) {
+    registry.addEndpoint("/ws-signal").setAllowedOriginPatterns("*").withSockJS();
+  }
 
-        // This is the prefix for messages the FRONTEND sends to the server (e.g., /app/signal.send)
-        registry.setApplicationDestinationPrefixes("/app");
-    }
+  @Override
+  public void configureMessageBroker(MessageBrokerRegistry registry) {
+    registry.enableSimpleBroker("/topic", "/queue").setHeartbeatValue(new long[] {10_000, 10_000}).setTaskScheduler(heartbeatScheduler());
+    registry.setApplicationDestinationPrefixes("/app");
+    registry.setUserDestinationPrefix("/user");
+  }
 
-    @Override
-    public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.interceptors(
-                new ChannelInterceptor() {
-                    @Override
-                    public Message<?> preSend(Message<?> message, MessageChannel channel) {
-                        StompHeaderAccessor accessor =
-                                MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+  private org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler heartbeatScheduler() {
+    var scheduler = new org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler();
+    scheduler.setPoolSize(1);
+    scheduler.setThreadNamePrefix("stomp-heartbeat-");
+    scheduler.initialize();
+    return scheduler;
+  }
 
-                        if (StompCommand.CONNECT.equals(accessor.getCommand())) {
-                            String bearerToken = accessor.getFirstNativeHeader("Authorization");
-                            String roomId = accessor.getFirstNativeHeader("roomId");
+  @Override
+  public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
+    // Chat, runner events and state updates are small; documents now go through Hocuspocus.
+    registration.setMessageSizeLimit(512 * 1024).setSendBufferSizeLimit(2 * 1024 * 1024).setSendTimeLimit(20_000);
+  }
 
-                            UUID userId = null;
-                            // Validating access token and extracting the userId
-                            if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
-                                String jwt = bearerToken.substring(7);
-                                if (jwtUtil.validateToken(jwt)) {
-                                    userId = jwtUtil.extractUserId(jwt);
-                                }
-                            }
-                            if (userId != null) {
-                                roomService.joinRoom(roomId, userId);
-                                accessor.setUser(new StompPrincipal(userId, roomId));
-                                roomService.mapSessionIdToUser(accessor.getSessionId(), roomId, userId);
-                                return message;
-                            }
-                            throw new MessagingException("unauthorized");
-                        }
+  @Override
+  public void configureClientInboundChannel(ChannelRegistration registration) {
+    registration.interceptors(
+        new ChannelInterceptor() {
+          @Override
+          public Message<?> preSend(Message<?> message, MessageChannel channel) {
+            StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+            if (accessor == null || accessor.getCommand() == null) return message;
 
-                        return message;
-                    }
-                });
-    }
+            if (StompCommand.CONNECT.equals(accessor.getCommand())) {
+              StompPrincipal principal =
+                  roomService.connect(
+                      accessor.getFirstNativeHeader("ticket"),
+                      accessor.getSessionId(),
+                      accessor.getFirstNativeHeader("clientId"),
+                      "true".equals(accessor.getFirstNativeHeader("takeover")));
+              accessor.setUser(principal);
+              return message;
+            }
+
+            if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
+              Principal user = accessor.getUser();
+              String destination = accessor.getDestination();
+              if (!(user instanceof StompPrincipal principal) || destination == null) throw new MessagingException("unauthorized");
+              boolean ownRoom = destination.startsWith("/topic/room/" + principal.getRoomId() + "/");
+              boolean ownQueue = destination.startsWith("/user/queue/");
+              if (!ownRoom && !ownQueue) throw new MessagingException("forbidden-destination");
+            }
+            return message;
+          }
+        });
+  }
 }

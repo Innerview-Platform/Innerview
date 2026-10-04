@@ -1,17 +1,13 @@
 package com.innerview.spring.service;
 
 import com.innerview.spring.dto.SfuAccessTokenDto;
-import com.innerview.spring.entity.User;
-import com.innerview.spring.exception.UserNotFound;
-import io.livekit.server.AccessToken;
-import io.livekit.server.RoomJoin;
-import io.livekit.server.RoomName;
-import org.springframework.stereotype.Service;
+import com.innerview.spring.entity.RoomParticipant;
 
-import java.util.Optional;
-import java.util.UUID;
-
-@Service
+/** LiveKit video/audio. */
 public interface SfuService {
-     SfuAccessTokenDto generateSfuAccessToken(String roomId, UUID userId);
+  /** A LiveKit token for an active participant of the room (identity = user id). */
+  SfuAccessTokenDto generateSfuAccessToken(String roomCode, RoomParticipant participant);
+
+  /** Drops the user's video connection (e.g. removed from the room). Best effort. */
+  void removeParticipant(String roomCode, java.util.UUID userId);
 }

@@ -12,6 +12,7 @@ import { StatCard } from '@/features/dashboard/components/StatCard'
 import { FeedbackList } from '@/features/feedback/components/FeedbackList'
 import { useFeedback } from '@/features/feedback/hooks/useFeedback'
 import { InterviewHistoryList } from '@/features/interviews/components/InterviewHistoryList'
+import { UpcomingInterviews } from '@/features/interviews/components/UpcomingInterviews'
 import { useInterviewHistory } from '@/features/interviews/hooks/useInterviews'
 import { useMyLanguages } from '@/features/languages/hooks/useLanguages'
 import { useMyProfile, useUserRating } from '@/features/profile/hooks/useProfile'
@@ -20,15 +21,15 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { paths } from '@/routes/paths'
 
 export default function DashboardPage() {
-  useDocumentTitle('Dashboard')
+  useDocumentTitle('Home')
   const user = useAppSelector(selectCurrentUser)!
   const profile = useMyProfile()
   const hasProfile = Boolean(profile.data)
 
-  // Profile-scoped endpoints 404 without a profile, so they only run once one exists.
+  // The rating endpoint needs a profile; history and feedback lists work without one.
   const rating = useUserRating(user.id, hasProfile)
-  const history = useInterviewHistory(user.id, { page: 0, limit: 5 }, { enabled: hasProfile })
-  const feedback = useFeedback(user.id, 'received', { page: 0, limit: 3 }, hasProfile)
+  const history = useInterviewHistory(user.id, { page: 0, limit: 5 }, { enabled: true })
+  const feedback = useFeedback(user.id, 'received', { page: 0, limit: 3 }, true)
   const languages = useMyLanguages()
 
   const profileLoading = profile.isPending
@@ -52,7 +53,7 @@ export default function DashboardPage() {
           className="mb-6"
           title="Complete your profile"
           action={
-            <Link to={paths.profile} className={buttonClasses({ size: 'sm' })}>
+            <Link to={paths.settings} className={buttonClasses({ size: 'sm' })}>
               Create profile
             </Link>
           }
@@ -79,9 +80,9 @@ export default function DashboardPage() {
         <StatCard
           label="Interviews"
           icon={History}
-          loading={profileLoading || (hasProfile && history.isPending)}
+          loading={history.isPending}
           value={history.data?.totalElements ?? '—'}
-          hint={hasProfile ? 'All-time sessions' : 'Requires a profile'}
+          hint="All-time sessions"
         />
         <StatCard
           label="Languages"
@@ -89,12 +90,19 @@ export default function DashboardPage() {
           loading={languages.isPending}
           value={languages.data?.length ?? '—'}
           hint={
-            <Link to={paths.profile} className="hover:text-fg-secondary hover:underline">
+            <Link to={paths.settings} className="hover:text-fg-secondary hover:underline">
               Manage languages
             </Link>
           }
         />
       </div>
+
+      <Card className="mt-6">
+        <CardHeader title="Upcoming" description="Interviews you host or are invited to." />
+        <CardBody className="py-0">
+          <UpcomingInterviews limit={5} />
+        </CardBody>
+      </Card>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-1">
@@ -121,17 +129,13 @@ export default function DashboardPage() {
           <CardHeader
             title="Recent interviews"
             action={
-              hasProfile && (
-                <Link to={paths.interviews} className={buttonClasses({ variant: 'ghost', size: 'sm' })}>
-                  View all
-                </Link>
-              )
+              <Link to={paths.interviews} className={buttonClasses({ variant: 'ghost', size: 'sm' })}>
+                View all
+              </Link>
             }
           />
-          {profileLoading || (hasProfile && history.isPending) ? (
+          {history.isPending ? (
             <SkeletonRows rows={3} className="p-5" />
-          ) : !hasProfile ? (
-            <EmptyState icon={<History className="h-5 w-5" />} title="No history yet" description="Create a profile to track your sessions." />
           ) : history.isError ? (
             <ErrorState error={history.error} onRetry={() => history.refetch()} />
           ) : history.data!.content.length === 0 ? (
@@ -142,7 +146,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {hasProfile && (
+      {(
         <Card className="mt-6">
           <CardHeader
             title="Latest feedback"

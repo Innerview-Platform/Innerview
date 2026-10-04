@@ -106,7 +106,7 @@ public class UserProfileServiceImpl implements UserProfileService {
             int page,
             int limit) {
 
-        getUserProfile(userId);
+        // Lists work without a profile (new users just get empty pages).
 
         Pageable pageable = PageRequest.of(page, limit, Sort.by(Sort.Direction.DESC, "interview.startTime"));
 
@@ -114,14 +114,14 @@ public class UserProfileServiceImpl implements UserProfileService {
     }
    @Override
     public Page<FeedbackDto> getUserReceivedFeedback(UUID userId, Integer rating, int page, int limit) {
-        getUserProfile(userId);
+        // Lists work without a profile (new users just get empty pages).
         Pageable pageable = PageRequest.of(page, limit, Sort.by(Sort.Direction.DESC, "createdAt"));
         return feedbackRepository.findFeedbackReceivedByUser(userId, rating, pageable);
     }
 
     @Override
     public Page<FeedbackDto> getUserGivenFeedback(UUID userId, int page, int limit) {
-        getUserProfile(userId);
+        // Lists work without a profile (new users just get empty pages).
         Pageable pageable = PageRequest.of(page, limit, Sort.by(Sort.Direction.DESC, "createdAt"));
         return feedbackRepository.findFeedbackGivenByUser(userId, pageable);
     }
