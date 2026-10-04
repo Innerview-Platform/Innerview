@@ -16,6 +16,8 @@ import java.util.UUID;
 public interface UserInterviewRepository extends JpaRepository<UserInterview, UserInterviewId> {
     boolean existsByIdInterviewIdAndIdUserId(Long interviewId, UUID userId);
 
+    java.util.List<UserInterview> findByIdInterviewId(Long interviewId);
+
     @Query("""
         SELECT new com.innerview.spring.dto.InterviewHistoryDto(
             i.id, cast(i.type as string), i.startTime, i.durationMinutes, cast(ui.role as string)
