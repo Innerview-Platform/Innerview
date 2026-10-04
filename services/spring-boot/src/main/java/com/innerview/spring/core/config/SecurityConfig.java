@@ -63,6 +63,8 @@ public class SecurityConfig {
                         "/api/auth/google/login",
                         "/api/auth/register",
                         "/api/auth/forgot-password",
+                        // Service-to-service; authenticated by the internal token in the controller.
+                        "/api/internal/**",
                                 "/api/problems")
                     .permitAll()
                     .anyRequest()

@@ -17,23 +17,6 @@ public class WebRtcP2pImpl implements WebRtcService {
   private final SimpMessagingTemplate messagingTemplate;
 
   @Override
-  public void join(ActiveRoom activeRoom, UUID userId) {
-    if (activeRoom.getMaxParticipants() == -1) return;
-    String roomId = activeRoom.getRoomId();
-    int numberOfPartcipants = activeRoom.getActiveParticipants();
-    String assignedRole = (numberOfPartcipants == 1) ? "impolite" : "polite";
-    Map<String, Object> payload = new HashMap<>();
-    payload.put("role", assignedRole);
-    payload.put("targetUserId", userId.toString());
-    SignalingMessage roleMessage = new SignalingMessage();
-
-    roleMessage.setType("ROLE");
-    roleMessage.setPayload(payload);
-    System.out.println(roleMessage);
-    messagingTemplate.convertAndSend("/topic/room/" + roomId + "/videocall", roleMessage);
-  }
-
-  @Override
   public void handleSignal(String roomId, SignalingMessage signalingMessage) {
     messagingTemplate.convertAndSend("/topic/room/" + roomId + "/videocall", signalingMessage);
   }
