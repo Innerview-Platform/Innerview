@@ -16,6 +16,7 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { getErrorMessage } from '@/lib/apiError'
 import { cn } from '@/lib/utils'
 import { paths } from '@/routes/paths'
+import { ProfileLink } from '@/features/profile/components/ProfileLink'
 
 const HIRE_SIGNALS: { value: HireSignal; label: string }[] = [
   { value: 'STRONG_YES', label: 'Strong yes' },
@@ -93,7 +94,8 @@ function ReviewCard({ interviewId, reviewee }: { interviewId: string; reviewee: 
     <Card className="p-5">
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-semibold">
-          {reviewee.name} <span className="text-sm font-normal text-fg-muted">· {ROOM_ROLE_LABELS[reviewee.role]}</span>
+          <ProfileLink username={reviewee.username}>{reviewee.name}</ProfileLink>{' '}
+          <span className="text-sm font-normal text-fg-muted">· {ROOM_ROLE_LABELS[reviewee.role]}</span>
         </h2>
         {reviewee.submitted && (
           <span className="flex items-center gap-1 text-xs text-success">
@@ -206,7 +208,8 @@ export default function InterviewFeedbackPage() {
             {f.received.map((feedback) => (
               <Card key={feedback.id} className="p-5">
                 <p className="mb-3 text-sm font-medium">
-                  {feedback.reviewerName} <span className="font-normal text-fg-muted">· {feedback.reviewerRole ? ROOM_ROLE_LABELS[feedback.reviewerRole] : ''}</span>
+                  <ProfileLink username={feedback.reviewerUsername}>{feedback.reviewerName}</ProfileLink>{' '}
+                  <span className="font-normal text-fg-muted">· {feedback.reviewerRole ? ROOM_ROLE_LABELS[feedback.reviewerRole] : ''}</span>
                 </p>
                 <FeedbackSummary feedback={feedback} />
               </Card>

@@ -63,6 +63,9 @@ public class SecurityConfig {
                         "/api/auth/google/login",
                         "/api/auth/register",
                         "/api/auth/forgot-password",
+                        "/api/auth/username-available",
+                        // Profile photos: public so <img> can load them (resumes are never served here).
+                        "/api/files/avatars/*",
                         // Service-to-service; authenticated by the internal token in the controller.
                         "/api/internal/**",
                                 "/api/problems")

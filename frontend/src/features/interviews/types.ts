@@ -77,7 +77,7 @@ export interface InterviewDetails {
   myRole: RoomRole
   owner: boolean
   staff: boolean
-  participants: { userId: string; name: string; role: RoomRole }[]
+  participants: { userId: string; name: string; username: string | null; avatarThumbUrl: string | null; role: RoomRole }[]
   sharedCode: string | null
   problemNotes: string | null
   interviewerNotes: string | null
@@ -117,8 +117,10 @@ export interface FeedbackView {
   id: number
   reviewerId: string
   reviewerName: string
+  reviewerUsername: string | null
   revieweeId: string
   revieweeName: string
+  revieweeUsername: string | null
   reviewerRole: RoomRole | null
   rating: number
   comment: string | null
@@ -136,6 +138,7 @@ export interface FeedbackForm {
   reviewees: {
     userId: string
     name: string
+    username: string | null
     role: RoomRole
     criteria: FeedbackCriterion[]
     hireSignal: boolean

@@ -16,6 +16,9 @@ export type AccessPolicy = 'OPEN' | 'ASK_TO_JOIN' | 'INVITE_ONLY'
 export interface RoomParticipant {
   userId: string
   name: string
+  /** Null for accounts without a username yet. */
+  username: string | null
+  avatarThumbUrl: string | null
   role: RoomRole
   status: ParticipantStatus
   /** Currently has host rights (the owner while present, otherwise handed off). */

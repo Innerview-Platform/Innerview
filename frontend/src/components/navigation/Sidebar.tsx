@@ -7,7 +7,6 @@ import { primaryNav } from '@/components/navigation/navItems'
 import { useLogout } from '@/features/auth/hooks/useAuthMutations'
 import { selectCurrentUser } from '@/features/auth/slices/authSlice'
 import { useMyProfile } from '@/features/profile/hooks/useProfile'
-import { EXPERIENCE_LEVEL_LABELS, labelFor } from '@/constants/enums'
 import { mobileNavClosed, selectSidebarCollapsed, sidebarToggled } from '@/store/uiSlice'
 import { cn } from '@/lib/utils'
 import { paths } from '@/routes/paths'
@@ -87,14 +86,14 @@ export function Sidebar({ variant = 'desktop' }: SidebarProps) {
           to={paths.settings}
           onClick={closeMobile}
           className={cn('flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-elevated', collapsed && 'justify-center')}
-          title={collapsed ? user?.email : undefined}
+          title={collapsed ? (profile?.name ?? user?.email) : undefined}
         >
-          <Avatar label={user?.email ?? '?'} src={profile?.image_url} size={32} />
+          <Avatar label={profile?.name || user?.email || '?'} src={profile?.avatar_thumb_url} size={32} />
           {!collapsed && (
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-medium text-fg">{user?.email}</p>
+              <p className="truncate text-[13px] font-medium text-fg">{profile?.name ?? user?.email}</p>
               <p className="truncate text-xs text-fg-muted">
-                {profile ? labelFor(EXPERIENCE_LEVEL_LABELS, profile.experience_level) : 'No profile yet'}
+                {profile?.username ? `@${profile.username}` : profile ? 'Complete your profile' : user?.email}
               </p>
             </div>
           )}

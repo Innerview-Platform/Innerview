@@ -5,6 +5,7 @@ import com.innerview.spring.entity.StoredFile;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -18,4 +19,13 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
       WHERE f.id = :id
       """)
   Optional<StoredFileInfo> findInfoById(@Param("id") UUID id);
+
+  /** Deletes without loading the row (and its BLOB) first. */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("DELETE FROM StoredFile f WHERE f.id = :id")
+  int deleteByIdWithoutLoading(@Param("id") UUID id);
+
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("DELETE FROM StoredFile f WHERE f.owner.id = :ownerId")
+  int deleteAllByOwner(@Param("ownerId") UUID ownerId);
 }

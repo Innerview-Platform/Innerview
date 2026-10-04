@@ -77,4 +77,21 @@ class DbFileStorageTest {
     storage.delete(stored.id());
     assertThat(storage.load(stored.id())).isEmpty();
   }
+
+  /**
+   * Regression: the delete is a bulk JPQL query, which bypasses Hibernate's persistence context. Without
+   * clearing it, a file loaded earlier in the same transaction was still returned after being deleted
+   * (e.g. replacing an avatar, then reading the profile in the same request).
+   */
+  @Test
+  void aDeletedFileIsGoneEvenIfItWasLoadedEarlierInTheSameTransaction() {
+    StoredFileInfo stored = storage.store(ownerId, StoredFileKind.AVATAR, "image/jpeg", "a.jpg", new byte[] {9, 9});
+    assertThat(storage.load(stored.id())).isPresent(); // now cached in the persistence context
+
+    storage.delete(stored.id());
+
+    assertThat(storage.load(stored.id())).isEmpty();
+    assertThat(storage.info(stored.id())).isEmpty();
+    assertThat(repository.existsById(stored.id())).isFalse();
+  }
 }

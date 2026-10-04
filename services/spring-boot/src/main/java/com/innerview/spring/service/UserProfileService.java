@@ -1,29 +1,34 @@
 package com.innerview.spring.service;
 
-import com.innerview.spring.dto.*;
-import com.innerview.spring.entity.UserProfile;
+import com.innerview.spring.dto.InterviewHistoryDto;
+import com.innerview.spring.dto.RegisterRequest;
+import com.innerview.spring.dto.UserAverageRatingResponse;
+import com.innerview.spring.dto.profile.MyProfileResponse;
+import com.innerview.spring.dto.profile.PublicProfileResponse;
+import com.innerview.spring.dto.profile.UpdateProfileRequest;
+import com.innerview.spring.entity.User;
 import com.innerview.spring.enums.InterviewStatus;
 import com.innerview.spring.enums.InterviewType;
-import org.springframework.data.domain.Page;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.RequestBody;
-
 import java.util.UUID;
+import org.springframework.data.domain.Page;
 
 public interface UserProfileService {
-    UserProfileResponse createProfile(UUID currentUserId, CreateProfileRequest createProfileRequest);
-    UserProfileResponse findProfileById(@AuthenticationPrincipal UUID currentUserId);
-    UserProfileResponse UpdateProfile(UUID currentUserID, CreateProfileRequest createProfileRequest);
-    void deleteUserProfileById(UUID currentUserID);
-    void changeUserProfilePhoto(@AuthenticationPrincipal UUID currentUserId, @RequestBody UpdateImageRequest updateImageRequest);
-    UserAverageRatingResponse getAverageRatingById(@AuthenticationPrincipal UUID currentUserId);
+
+    /** Creates the profile for a newly registered user, in the caller's transaction. */
+    void createInitialProfile(User user, RegisterRequest request);
+
+    MyProfileResponse getMyProfile(UUID userId);
+
+    MyProfileResponse updateMyProfile(UUID userId, UpdateProfileRequest request);
+
+    PublicProfileResponse getPublicProfile(UUID viewerId, String username);
+
+    UserAverageRatingResponse getAverageRatingById(UUID userId);
+
     Page<InterviewHistoryDto> getUserInterviewHistory(
             UUID userId,
             InterviewStatus status,
             InterviewType type,
             int page,
             int limit);
-    Page<FeedbackDto> getUserGivenFeedback(UUID userId, int page, int limit);
-    Page<FeedbackDto> getUserReceivedFeedback(UUID userId, Integer rating, int page, int limit);
-    UserProfile getUserProfile(UUID currentUserID );
 }

@@ -9,8 +9,7 @@ import { EmptyState, ErrorState } from '@/components/feedback/states'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { selectCurrentUser } from '@/features/auth/slices/authSlice'
 import { StatCard } from '@/features/dashboard/components/StatCard'
-import { FeedbackList } from '@/features/feedback/components/FeedbackList'
-import { useFeedback } from '@/features/feedback/hooks/useFeedback'
+import { RecentReviewsCard } from '@/features/feedback/components/RecentReviewsCard'
 import { InterviewHistoryList } from '@/features/interviews/components/InterviewHistoryList'
 import { UpcomingInterviews } from '@/features/interviews/components/UpcomingInterviews'
 import { useInterviewHistory } from '@/features/interviews/hooks/useInterviews'
@@ -24,16 +23,12 @@ export default function DashboardPage() {
   useDocumentTitle('Home')
   const user = useAppSelector(selectCurrentUser)!
   const profile = useMyProfile()
-  const hasProfile = Boolean(profile.data)
 
-  // The rating endpoint needs a profile; history and feedback lists work without one.
-  const rating = useUserRating(user.id, hasProfile)
+  const rating = useUserRating(user.id)
   const history = useInterviewHistory(user.id, { page: 0, limit: 5 }, { enabled: true })
-  const feedback = useFeedback(user.id, 'received', { page: 0, limit: 3 }, true)
   const languages = useMyLanguages()
 
-  const profileLoading = profile.isPending
-  const noProfile = !profileLoading && !profile.isError && !hasProfile
+  const profileIncomplete = profile.data ? !profile.data.profile_complete : false
 
   return (
     <>
@@ -47,18 +42,18 @@ export default function DashboardPage() {
         }
       />
 
-      {noProfile && (
+      {profileIncomplete && (
         <Alert
           tone="info"
           className="mb-6"
           title="Complete your profile"
           action={
             <Link to={paths.settings} className={buttonClasses({ size: 'sm' })}>
-              Create profile
+              Complete profile
             </Link>
           }
         >
-          Add your experience level and preferred role to unlock interview history, feedback and ratings.
+          Pick a username and add your employment, university and college so interview partners know who they're meeting.
         </Alert>
       )}
 
@@ -66,16 +61,16 @@ export default function DashboardPage() {
         <StatCard
           label="Average rating"
           icon={Star}
-          loading={profileLoading || (hasProfile && rating.isPending)}
+          loading={rating.isPending}
           value={rating.data?.total_reviews ? rating.data.average_rating.toFixed(1) : '—'}
-          hint={hasProfile ? 'Across all reviews' : 'Requires a profile'}
+          hint="Across all reviews"
         />
         <StatCard
           label="Reviews received"
           icon={TrendingUp}
-          loading={profileLoading || (hasProfile && rating.isPending)}
+          loading={rating.isPending}
           value={rating.data?.total_reviews ?? '—'}
-          hint={hasProfile ? 'From interview partners' : 'Requires a profile'}
+          hint="From interview partners"
         />
         <StatCard
           label="Interviews"
@@ -146,27 +141,9 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {(
-        <Card className="mt-6">
-          <CardHeader
-            title="Latest feedback"
-            action={
-              <Link to={paths.feedback} className={buttonClasses({ variant: 'ghost', size: 'sm' })}>
-                View all
-              </Link>
-            }
-          />
-          {feedback.isPending ? (
-            <SkeletonRows rows={2} className="p-5" />
-          ) : feedback.isError ? (
-            <ErrorState error={feedback.error} onRetry={() => feedback.refetch()} />
-          ) : feedback.data.content.length === 0 ? (
-            <EmptyState icon={<Star className="h-5 w-5" />} title="No feedback yet" description="Ratings from your interview partners will show up here." />
-          ) : (
-            <FeedbackList items={feedback.data.content} direction="received" />
-          )}
-        </Card>
-      )}
+      <div className="mt-6">
+        <RecentReviewsCard title="Latest reviews" />
+      </div>
     </>
   )
 }

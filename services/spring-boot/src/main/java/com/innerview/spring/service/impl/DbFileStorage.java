@@ -79,7 +79,7 @@ public class DbFileStorage implements FileStorage {
   @Override
   @Transactional
   public void delete(UUID fileId) {
-    repository.deleteById(fileId);
+    repository.deleteByIdWithoutLoading(fileId);
   }
 
   private static StoredFileInfo toInfo(StoredFile file, UUID ownerId) {

@@ -6,6 +6,7 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import com.innerview.spring.core.util.JwtUtil;
+import com.innerview.spring.core.util.RevokedUsers;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -25,6 +26,7 @@ import java.util.UUID;
 public class JwtFilter extends OncePerRequestFilter {
 
 	private final JwtUtil jwtUtil;
+	private final RevokedUsers revokedUsers;
 
 	// DELETED: private final UserRepository userRepository;
 
@@ -40,6 +42,11 @@ public class JwtFilter extends OncePerRequestFilter {
 			if (jwt != null && jwtUtil.validateAccessToken(jwt)) {
 				//extract the ID directly from the token payload
 				UUID currentUserId = jwtUtil.extractUserId(jwt);
+				if (revokedUsers.isRevoked(currentUserId)) {
+					// The account was deleted after this token was issued: treat the request as anonymous.
+					filterChain.doFilter(request, response);
+					return;
+				}
 
 				//Put the UUID directly into the SecurityContext, NO database query!
 				UsernamePasswordAuthenticationToken authentication =
