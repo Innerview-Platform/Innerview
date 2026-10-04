@@ -1,3 +1,9 @@
+# Local development: `docker compose up -d --build` (or `make dev`, see Makefile).
+# Production (VPS):   also load docker-compose.prod.yml; see docs/DEPLOYMENT.md.
+#
+# Host ports are bound to 127.0.0.1 so databases, Piston and the internal services are never
+# reachable from other machines (Docker's port publishing bypasses host firewalls such as ufw).
+# Only LiveKit's media ports (7881/tcp, 7882/udp) are public.
 services:
   # ── Frontend (React + nginx reverse proxy) ──────
   frontend:
@@ -8,10 +14,14 @@ services:
         VITE_LIVEKIT_URL: ${VITE_LIVEKIT_URL:-ws://localhost:7880}
     container_name: innerview-frontend
     ports:
-      - "${FRONTEND_PORT:-3000}:80"
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:80"
     depends_on:
       backend:
         condition: service_healthy
+      canvas:
+        condition: service_started
+      editor:
+        condition: service_started
     restart: unless-stopped
     networks:
       - innerview-network
@@ -23,7 +33,7 @@ services:
       dockerfile: Dockerfile
     container_name: innerview-backend
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
     environment:
       # Database
       DB_URL: jdbc:mysql://mysql:3306/innerview?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
@@ -43,6 +53,21 @@ services:
       # Google OAuth2 (optional — set in .env for real Google login)
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-dummy-client-id}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-dummy-client-secret}
+      GOOGLE_API_CLIENT_ID: ${GOOGLE_API_CLIENT_ID:-dummy-client-id}
+      GOOGLE_API_CLIENT_SECRET: ${GOOGLE_API_CLIENT_SECRET:-dummy-client-secret}
+
+      # Piston code execution
+      PISTON_URL: http://piston:2000
+
+      # DynamoDB Local (in-app notifications)
+      DYNAMODB_ENDPOINT: http://dynamodb:8000
+
+      # Collaboration services (internal URLs) and LiveKit
+      EDITOR_URL: http://editor:1234
+      CANVAS_URL: http://canvas:5858
+      LIVEKIT_URL: http://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-secret}
 
       # Mail (optional — leave blank if not using)
       MAIL_USERNAME: ${MAIL_USERNAME:-}
@@ -52,6 +77,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      piston:
+        condition: service_started
+      dynamodb:
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
       interval: 30s
@@ -72,7 +101,7 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD:-innerview_pass}
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_pass}
     ports:
-      - "${DB_PORT:-3306}:3306"
+      - "127.0.0.1:${DB_PORT:-3306}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
@@ -89,9 +118,9 @@ services:
   redis:
     image: redis:7.2-alpine
     container_name: innerview-redis
-    command: redis-server --save 60 1 --loglevel warning
+    command: redis-server --appendonly yes --appendfsync everysec --save 60 1 --loglevel warning
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -103,13 +132,97 @@ services:
     networks:
       - innerview-network
 
+  # ── DynamoDB Local (in-app notifications) ────────
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    container_name: innerview-dynamodb
+    command: "-jar DynamoDBLocal.jar -sharedDb -inMemory"
+    ports:
+      - "127.0.0.1:${DYNAMODB_PORT:-8000}:8000"
+    restart: unless-stopped
+    networks:
+      - innerview-network
+
+  # ── Shared whiteboard (self-hosted Excalidraw sync server) ──
+  # services/nodejs/collaboration-canvas — the frontend's nginx proxies /canvas/* here.
+  canvas:
+    build:
+      context: ./services/nodejs/collaboration-canvas
+    container_name: innerview-canvas
+    ports:
+      - "127.0.0.1:${CANVAS_PORT:-5858}:5858"
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-for-dev-only-change-in-production}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      CANVAS_REDIS_URL: redis://redis:6379
+      CANVAS_RETENTION_DAYS: ${CANVAS_RETENTION_DAYS:-180}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5858/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - innerview-network
+
+  # ── Shared code editor + notes (self-hosted Hocuspocus / Yjs) ──
+  # services/nodejs/collaboration-editor — the frontend's nginx proxies /collab/* here.
+  editor:
+    build:
+      context: ./services/nodejs/collaboration-editor
+    container_name: innerview-editor
+    ports:
+      - "127.0.0.1:${EDITOR_PORT:-1234}:1234"
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-for-dev-only-change-in-production}
+      BACKEND_INTERNAL_URL: http://backend:8080
+      EDITOR_REDIS_URL: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:1234/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - innerview-network
+
+  # ── Piston (sandboxed code execution) ────────────
+  # https://github.com/engineer-man/piston — runs code for the shared editor's Run button
+  # (interactive, via ws://piston:2000/api/v2/connect) and for submission judging.
+  # Runtimes are installed once into the piston-packages volume; see DOCKER.md.
+  piston:
+    image: ghcr.io/engineer-man/piston
+    container_name: innerview-piston
+    privileged: true
+    ports:
+      - "127.0.0.1:${PISTON_PORT:-2000}:2000"
+    environment:
+      # Interactive runs wait on user input, so allow up to 5 minutes of wall time per run.
+      # CPU time stays low, which still stops busy loops quickly.
+      PISTON_RUN_TIMEOUT: 300000
+      PISTON_RUN_CPU_TIME: 10000
+      PISTON_OUTPUT_MAX_SIZE: 65536
+    volumes:
+      - piston-packages:/piston/packages
+    tmpfs:
+      - /tmp:exec
+    restart: unless-stopped
+    networks:
+      - innerview-network
+
   # ── LiveKit SFU (Video / Audio streaming) ────────
   livekit:
     image: livekit/livekit-server:latest
     container_name: innerview-livekit
     command: --dev --bind 0.0.0.0
     ports:
-      - "7880:7880"
+      - "127.0.0.1:7880:7880"
       - "7881:7881"
       - "7882:7882/udp"
     restart: unless-stopped
@@ -119,6 +232,7 @@ services:
 volumes:
   mysql-data:
   redis-data:
+  piston-packages:
 
 networks:
   innerview-network:

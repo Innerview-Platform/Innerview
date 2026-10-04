@@ -41,7 +41,7 @@ export default function RegisterPage() {
         if (session) {
           toast.success('Account created', { description: 'Set up your profile to get the most out of InnerView.' })
           const from = (location.state as RedirectState | null)?.from
-          navigate(from?.startsWith('/') ? from : paths.settings, { replace: true })
+          navigate(from?.startsWith('/') ? from : paths.profile, { replace: true })
           dispatch(sessionStarted(session))
         } else {
           toast.success('Account created — please sign in.')
