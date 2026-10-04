@@ -76,3 +76,34 @@ test('review tickets and persisted ended rooms reject edits', async () => {
   assert.equal(JSON.parse(data.get('three')!.scene!).elements[0].version, 2)
   assert.equal(data.get('three')!.closed, true)
 })
+
+test('stale scenes cannot remove newer strokes or resurrect deletions', async () => {
+  const room = await getOrCreateRoom('strokes')
+  const first = connect(room)
+  const second = connect(room)
+  const send = (socket: Socket, elements: unknown[]) => socket.emit('message', Buffer.from(JSON.stringify({
+    type: 'scene', scene: { elements, files: {} },
+  })), false)
+  send(first, [{ id: 'a', version: 1, versionNonce: 10 }])
+  send(first, [{ id: 'a', version: 2, versionNonce: 20, isDeleted: true }, { id: 'b', version: 1, versionNonce: 30 }])
+  send(second, [{ id: 'a', version: 1, versionNonce: 10 }, { id: 'c', version: 1, versionNonce: 40 }])
+  await room.flush()
+  const scene = JSON.parse(data.get('strokes')!.scene!)
+  assert.deepEqual(scene.elements.map((element: { id: string }) => element.id), ['a', 'b', 'c'])
+  assert.equal(scene.elements[0].isDeleted, true)
+})
+
+test('equal-version conflicts use Excalidraw lower-nonce rule regardless of arrival order', async () => {
+  for (const nonces of [[90, 10], [10, 90]]) {
+    const id = `conflict-${nonces[0]}`
+    const room = await getOrCreateRoom(id)
+    const socket = connect(room)
+    for (const versionNonce of nonces) {
+      socket.emit('message', Buffer.from(JSON.stringify({ type: 'scene', scene: {
+        elements: [{ id: 'shape', version: 2, versionNonce }], files: {},
+      } })), false)
+    }
+    await room.flush()
+    assert.equal(JSON.parse(data.get(id)!.scene!).elements[0].versionNonce, 10)
+  }
+})
