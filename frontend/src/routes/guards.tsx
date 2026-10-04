@@ -26,7 +26,7 @@ export function GuestRoute() {
 
   if (isAuthenticated) {
     const from = (location.state as RedirectState | null)?.from
-    return <Navigate to={from && from.startsWith('/') ? from : paths.dashboard} replace />
+    return <Navigate to={from && from.startsWith('/') ? from : paths.home} replace />
   }
   return <Outlet />
 }

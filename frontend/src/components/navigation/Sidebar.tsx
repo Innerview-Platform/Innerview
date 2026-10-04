@@ -32,7 +32,7 @@ export function Sidebar({ variant = 'desktop' }: SidebarProps) {
   return (
     <div className="flex h-full flex-col">
       <div className={cn('flex h-16 items-center border-b border-border', collapsed ? 'justify-center px-2' : 'justify-between px-4')}>
-        <Link to={paths.dashboard} onClick={closeMobile} className="flex items-center gap-2" aria-label="InnerView dashboard">
+        <Link to={paths.home} onClick={closeMobile} className="flex items-center gap-2" aria-label="InnerView dashboard">
           <LogoMark size={28} />
           {!collapsed && <span className="text-base font-bold tracking-tight">InnerView</span>}
         </Link>
@@ -84,7 +84,7 @@ export function Sidebar({ variant = 'desktop' }: SidebarProps) {
 
       <div className="border-t border-border p-2">
         <Link
-          to={paths.profile}
+          to={paths.settings}
           onClick={closeMobile}
           className={cn('flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-elevated', collapsed && 'justify-center')}
           title={collapsed ? user?.email : undefined}

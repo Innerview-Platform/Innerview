@@ -22,7 +22,7 @@ export default function RouteErrorPage() {
         <button onClick={() => window.location.reload()} className={buttonClasses()}>
           Reload page
         </button>
-        <Link to={paths.dashboard} className={buttonClasses({ variant: 'secondary' })}>
+        <Link to={paths.home} className={buttonClasses({ variant: 'secondary' })}>
           Dashboard
         </Link>
       </div>

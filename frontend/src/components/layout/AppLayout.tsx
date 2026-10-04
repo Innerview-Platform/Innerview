@@ -43,7 +43,7 @@ export function AppLayout() {
       </aside>
 
       <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-border bg-surface/90 px-4 backdrop-blur lg:hidden">
-        <Link to={paths.dashboard}>
+        <Link to={paths.home}>
           <Logo size={26} />
         </Link>
         <button
