@@ -35,6 +35,22 @@
         "editor"
       ],
       "port": 1234
+    },
+    {
+      "name": "innerview-web-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "frontend",
+        "run",
+        "dev"
+      ],
+      "port": 3100,
+      "env": {
+        "PORT": "3100",
+        "VITE_DEV_PROXY_TARGET": "http://localhost:8081",
+        "VITE_LIVEKIT_URL": "ws://localhost:7880"
+      }
     }
   ]
 }

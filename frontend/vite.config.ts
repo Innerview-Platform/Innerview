@@ -34,6 +34,11 @@ export default defineConfig(({ mode }) => {
       // Google OAuth redirects back to FRONTEND_URL, so never drift to another port.
       strictPort: true,
       proxy: {
+        // Google sign-in (Spring Security OAuth2). Like nginx in production, keep the browser's Host so
+        // the backend's redirects stay on this origin. Listed before '/api' so it matches first.
+        '/api/auth/google': { target: proxyTarget, changeOrigin: false },
+        '/oauth2': { target: proxyTarget, changeOrigin: false },
+        '/login/oauth2': { target: proxyTarget, changeOrigin: false },
         '/api': { target: proxyTarget, changeOrigin: true, ...stripOrigin },
         '/ws-signal': { target: proxyTarget, ws: true, changeOrigin: true, ...stripOrigin },
         // Excalidraw sync server (services/nodejs/collaboration-canvas) for the shared whiteboard.

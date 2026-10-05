@@ -2,16 +2,9 @@ import { useEffect, useRef } from 'react'
 import { basicSetup } from 'codemirror'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
-import { oneDark } from '@codemirror/theme-one-dark'
+import { editorTheme } from '@/lib/codemirrorTheme'
 
-const theme = EditorView.theme(
-  {
-    '&': { backgroundColor: 'var(--color-surface)', fontSize: '13px', height: '100%' },
-    '.cm-gutters': { backgroundColor: 'var(--color-surface)', borderRight: '1px solid var(--color-border)' },
-    '.cm-scroller': { fontFamily: 'var(--font-mono)' },
-  },
-  { dark: true },
-)
+const theme = EditorView.theme({ '&': { fontSize: '13px', height: '100%' } })
 
 /** A view-only CodeMirror for saved code (summary page, replay). */
 export function ReadOnlyCode({ value, label }: { value: string; label: string }) {
@@ -23,7 +16,7 @@ export function ReadOnlyCode({ value, label }: { value: string; label: string })
       parent: hostRef.current!,
       state: EditorState.create({
         doc: '',
-        extensions: [basicSetup, oneDark, theme, EditorState.readOnly.of(true), EditorView.editable.of(false), EditorView.contentAttributes.of({ 'aria-label': label })],
+        extensions: [basicSetup, editorTheme, theme, EditorState.readOnly.of(true), EditorView.editable.of(false), EditorView.contentAttributes.of({ 'aria-label': label })],
       }),
     })
     viewRef.current = view

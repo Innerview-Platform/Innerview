@@ -72,6 +72,7 @@ services:
       # Mail (optional — leave blank if not using)
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
     depends_on:
       mysql:
         condition: service_healthy

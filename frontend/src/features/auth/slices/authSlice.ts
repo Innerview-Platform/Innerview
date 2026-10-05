@@ -2,7 +2,7 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
 import type { AuthUser } from '@/features/auth/types'
 import { getTokenExpiry, loadSession } from '@/features/auth/utils/session'
 
-export type SessionEndReason = 'expired' | 'signed-out' | null
+type SessionEndReason = 'expired' | 'signed-out' | null
 
 export interface AuthState {
   accessToken: string | null

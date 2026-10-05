@@ -2,14 +2,17 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { Spinner } from '@/components/common/Spinner'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'destructive'
 export type ButtonSize = 'sm' | 'md' | 'lg' | 'icon'
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: 'bg-primary text-white hover:bg-primary-hover shadow-sm shadow-primary/20',
-  secondary: 'border border-border bg-transparent text-fg hover:border-fg-muted hover:bg-elevated',
+  primary: 'bg-primary text-on-primary hover:bg-primary-hover active:bg-primary-dark',
+  secondary: 'border border-border bg-surface text-fg hover:border-fg-muted/60 hover:bg-elevated',
   ghost: 'bg-transparent text-fg-secondary hover:bg-elevated hover:text-fg',
+  /** Outlined: secondary actions with consequences (end interview, delete…). */
   danger: 'border border-danger/40 bg-transparent text-danger hover:bg-danger/10',
+  /** Solid: the confirming button of a destructive dialog, or "leave call". */
+  destructive: 'bg-danger-solid text-white hover:bg-danger-solid/90',
 }
 
 const sizeClasses: Record<ButtonSize, string> = {
@@ -26,7 +29,7 @@ export function buttonClasses({
   className,
 }: { variant?: ButtonVariant; size?: ButtonSize; className?: string } = {}) {
   return cn(
-    'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-lg font-medium transition-colors',
+    'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-lg font-medium transition-[color,background-color,border-color,transform] duration-150 active:translate-y-px',
     'disabled:pointer-events-none disabled:opacity-50',
     variantClasses[variant],
     sizeClasses[size],

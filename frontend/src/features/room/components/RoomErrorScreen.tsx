@@ -6,10 +6,10 @@ import { getErrorMessage, toApiError } from '@/lib/apiError'
 import { paths } from '@/routes/paths'
 
 function describe(error: unknown) {
-  const { status, serverMessage } = toApiError(error)
+  const { status, serverMessage, code } = toApiError(error)
   if (status === 404) return { icon: SearchX, title: 'Room not found', text: 'Check the code or link and try again.' }
   if (status === 410) return { icon: DoorClosed, title: 'This interview has ended', text: 'The session was completed or cancelled.' }
-  if (status === 403 && serverMessage?.toLowerCase().includes('full')) return { icon: Users, title: 'Room is full', text: 'This room has reached its participant limit.' }
+  if (code === 'ROOM_FULL') return { icon: Users, title: 'Room is full', text: 'This room has reached its participant limit.' }
   if (status === 403) return { icon: CalendarClock, title: "This interview hasn't started", text: serverMessage ?? 'Come back at the scheduled start time.' }
   return { icon: DoorClosed, title: "Couldn't join the room", text: getErrorMessage(error) }
 }

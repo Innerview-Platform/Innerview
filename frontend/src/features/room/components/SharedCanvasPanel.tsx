@@ -8,6 +8,7 @@ import { AlertTriangle } from 'lucide-react'
 import { Spinner } from '@/components/common/Spinner'
 import { getCanvasUrl } from '@/constants/config'
 import type { RoomRealtime } from '@/features/room/hooks/useRoomRealtime'
+import { useTheme } from '@/lib/theme'
 
 type Scene = { elements: readonly ExcalidrawElement[]; files: BinaryFiles }
 type CanvasStatus = 'connecting' | 'live' | 'reconnecting' | 'error'
@@ -34,6 +35,7 @@ interface SharedCanvasPanelProps {
 
 /** System-design whiteboard shared by everyone in the room, synced through the self-hosted Excalidraw server. */
 export function SharedCanvasPanel({ roomId, fetchTicket, header, className, readOnly = false }: SharedCanvasPanelProps) {
+  const { theme } = useTheme()
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null)
   const [status, setStatus] = useState<CanvasStatus>('connecting')
   const socketRef = useRef<WebSocket | null>(null)
@@ -156,7 +158,7 @@ export function SharedCanvasPanel({ roomId, fetchTicket, header, className, read
             onChange={onChange}
             isCollaborating
             viewModeEnabled={readOnly}
-            theme="dark"
+            theme={theme}
             name="InnerView whiteboard"
             autoFocus={false}
           />

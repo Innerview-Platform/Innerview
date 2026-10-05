@@ -8,13 +8,13 @@ import { Alert } from '@/components/feedback/Alert'
 import { EmptyState, ErrorState } from '@/components/feedback/states'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { selectCurrentUser } from '@/features/auth/slices/authSlice'
-import { StatCard } from '@/features/dashboard/components/StatCard'
+import { Stat } from '@/features/dashboard/components/StatCard'
 import { RecentReviewsCard } from '@/features/feedback/components/RecentReviewsCard'
 import { InterviewHistoryList } from '@/features/interviews/components/InterviewHistoryList'
 import { UpcomingInterviews } from '@/features/interviews/components/UpcomingInterviews'
 import { useInterviewHistory } from '@/features/interviews/hooks/useInterviews'
 import { useMyLanguages } from '@/features/languages/hooks/useLanguages'
-import { useMyProfile, useUserRating } from '@/features/profile/hooks/useProfile'
+import { useMyProfile } from '@/features/profile/hooks/useProfile'
 import { JoinRoomForm } from '@/features/room/components/JoinRoomForm'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { paths } from '@/routes/paths'
@@ -24,7 +24,6 @@ export default function DashboardPage() {
   const user = useAppSelector(selectCurrentUser)!
   const profile = useMyProfile()
 
-  const rating = useUserRating(user.id)
   const history = useInterviewHistory(user.id, { page: 0, limit: 5 }, { enabled: true })
   const languages = useMyLanguages()
 
@@ -33,8 +32,8 @@ export default function DashboardPage() {
   return (
     <>
       <PageHeader
-        title="Welcome back"
-        description={user.email}
+        title={profile.data?.name ? `Welcome back, ${profile.data.name.split(' ')[0]}` : 'Welcome back'}
+        description="Your interviews, feedback and what's coming up."
         actions={
           <Link to={paths.newInterview} className={buttonClasses()}>
             <CalendarPlus className="h-4 w-4" /> New interview
@@ -57,29 +56,29 @@ export default function DashboardPage() {
         </Alert>
       )}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard
+      <Card className="grid grid-cols-2 lg:grid-cols-4 [&>*]:border-border max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(odd)]:border-r lg:[&>*:not(:last-child)]:border-r">
+        <Stat
           label="Average rating"
           icon={Star}
-          loading={rating.isPending}
-          value={rating.data?.total_reviews ? rating.data.average_rating.toFixed(1) : '—'}
+          loading={profile.isPending}
+          value={profile.data?.total_reviews && profile.data.average_rating != null ? profile.data.average_rating.toFixed(1) : '—'}
           hint="Across all reviews"
         />
-        <StatCard
+        <Stat
           label="Reviews received"
           icon={TrendingUp}
-          loading={rating.isPending}
-          value={rating.data?.total_reviews ?? '—'}
+          loading={profile.isPending}
+          value={profile.data?.total_reviews ?? '—'}
           hint="From interview partners"
         />
-        <StatCard
+        <Stat
           label="Interviews"
           icon={History}
           loading={history.isPending}
           value={history.data?.totalElements ?? '—'}
           hint="All-time sessions"
         />
-        <StatCard
+        <Stat
           label="Languages"
           icon={Code2}
           loading={languages.isPending}
@@ -90,7 +89,7 @@ export default function DashboardPage() {
             </Link>
           }
         />
-      </div>
+      </Card>
 
       <Card className="mt-6">
         <CardHeader title="Upcoming" description="Interviews you host or are invited to." />

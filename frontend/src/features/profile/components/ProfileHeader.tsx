@@ -29,7 +29,11 @@ export function ProfileHeader({ profile, avatar, actions, emailNote }: ProfileHe
 
   return (
     <Card className="overflow-hidden">
-      <div className="h-20 bg-gradient-to-r from-primary/30 via-accent/20 to-transparent sm:h-24" aria-hidden />
+      <div
+        className="h-20 border-b border-border-subtle bg-elevated sm:h-24"
+        style={{ backgroundImage: 'radial-gradient(var(--color-border) 1px, transparent 1px)', backgroundSize: '14px 14px' }}
+        aria-hidden
+      />
       <div className="px-4 pb-5 sm:px-6">
         <div className="-mt-10 flex flex-wrap items-end justify-between gap-3">
           {avatar ?? <Avatar label={profile.name} src={profile.avatar_url} size={88} className="ring-4 ring-surface" />}

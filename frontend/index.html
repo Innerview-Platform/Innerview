@@ -1,16 +1,28 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="InnerView — peer-to-peer mock interviews for software engineers." />
-    <meta name="theme-color" content="#08090D" />
+    <meta name="description" content="InnerView — realistic mock technical interviews with real engineers: video, a shared editor and whiteboard, and structured feedback." />
+    <meta name="theme-color" content="#080a13" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Apply the saved (or system) theme before first paint; keep in sync with src/lib/theme.ts. -->
+    <script>
+      ;(function () {
+        try {
+          var saved = localStorage.getItem('innerview.theme')
+          var pref = saved === 'light' || saved === 'dark' ? saved : 'system'
+          var theme = pref === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : pref
+          document.documentElement.dataset.theme = theme
+          document.querySelector('meta[name="theme-color"]').content = theme === 'light' ? '#f7f7fb' : '#080a13'
+        } catch (e) {}
+      })()
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap"
     />
     <title>InnerView</title>
   </head>

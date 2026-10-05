@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeftRight, Crown, FileText, Lock, UserMinus, UserPlus, Users } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowLeftRight, Crown, FileText, Lock, UserMinus, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar } from '@/components/common/Avatar'
 import { Badge } from '@/components/common/Badge'
@@ -12,63 +11,29 @@ import { ProfileLink } from '@/features/profile/components/ProfileLink'
 import { ResumePreviewModal } from '@/features/profile/components/ResumePreviewModal'
 import { roomApi } from '@/features/room/api/roomApi'
 import { InviteDialog } from '@/features/room/components/InviteDialog'
+import type { Lobby } from '@/features/room/hooks/useLobby'
 import type { RoomRealtime } from '@/features/room/hooks/useRoomRealtime'
-import type { AccessPolicy, AccessRequest, RoomParticipant, RoomRole } from '@/features/room/types'
+import type { AccessPolicy, RoomParticipant, RoomRole } from '@/features/room/types'
 import { ACCESS_POLICY_LABELS, ROOM_ROLE_LABELS } from '@/features/room/utils/labels'
 import { getErrorMessage } from '@/lib/apiError'
 import { cn } from '@/lib/utils'
 
 interface ParticipantsPanelProps {
   realtime: RoomRealtime
+  lobby: Lobby
   currentUserId: string
 }
 
 /**
- * People in the room, and the lobby: host/interviewers see who's waiting (also as a toast) and admit
- * or deny them. The host changes roles, swaps interviewer/candidate and sets who may join.
+ * People in the room, and the lobby: host/interviewers see who's waiting and admit or deny them.
+ * The host changes roles, swaps interviewer/candidate and sets who may join.
  */
-export function ParticipantsPanel({ realtime, currentUserId }: ParticipantsPanelProps) {
+export function ParticipantsPanel({ realtime, lobby, currentUserId }: ParticipantsPanelProps) {
   const { room, me, code } = realtime
-  const queryClient = useQueryClient()
+  const { waiting } = lobby
   const [inviteOpen, setInviteOpen] = useState(false)
   const [removing, setRemoving] = useState<RoomParticipant | null>(null)
   const [resumeOf, setResumeOf] = useState<RoomParticipant | null>(null)
-
-  // ── lobby ────────────────────────────────────────────────────────────────
-  const requestsKey = useMemo(() => ['rooms', code, 'requests'] as const, [code])
-  const requests = useQuery({ queryKey: requestsKey, queryFn: () => roomApi.requests(code), enabled: me.staff && realtime.status === 'connected' })
-  const waiting = requests.data ?? []
-
-  const decide = useMutation({
-    mutationFn: ({ request, admit, role }: { request: AccessRequest; admit: boolean; role?: RoomRole }) =>
-      admit ? roomApi.admit(code, request.id, role) : roomApi.deny(code, request.id),
-    onSettled: (_data, _error, { request }) => {
-      toast.dismiss(`lobby-${request.id}`)
-      queryClient.setQueryData<AccessRequest[]>(requestsKey, (current) => current?.filter((r) => r.id !== request.id))
-    },
-    onError: (error) => toast.error("Couldn't update the request", { description: getErrorMessage(error) }),
-  })
-
-  useEffect(
-    () =>
-      realtime.subscribeLobby(({ type, request }) => {
-        if (type === 'REQUEST') {
-          queryClient.setQueryData<AccessRequest[]>(requestsKey, (current = []) => [...current.filter((r) => r.id !== request.id), request])
-          toast(`${request.name} wants to join`, {
-            id: `lobby-${request.id}`,
-            duration: 60_000,
-            action: { label: 'Admit', onClick: () => decide.mutate({ request, admit: true }) },
-            cancel: { label: 'Deny', onClick: () => decide.mutate({ request, admit: false }) },
-          })
-        } else {
-          toast.dismiss(`lobby-${request.id}`)
-          queryClient.setQueryData<AccessRequest[]>(requestsKey, (current) => current?.filter((r) => r.id !== request.id))
-        }
-      }),
-    // decide.mutate is stable
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [realtime.subscribeLobby, queryClient, requestsKey],
-  )
 
   // ── people ───────────────────────────────────────────────────────────────
   const people = room.participants
@@ -82,29 +47,22 @@ export function ParticipantsPanel({ realtime, currentUserId }: ParticipantsPanel
     action().catch((error) => toast.error(failure, { description: getErrorMessage(error) }))
 
   return (
-    <section className="flex min-h-0 flex-col" aria-label="Participants">
-      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
-        <h2 className="flex items-center gap-2 text-sm font-semibold">
-          <Users className="h-4 w-4 text-fg-muted" aria-hidden /> People
-          <span className="text-xs font-normal text-fg-muted">
-            {people.length}
-            {room.maxParticipants > 0 ? ` / ${room.maxParticipants}` : ''}
-          </span>
-        </h2>
-        {me.staff && (
-          <Button size="sm" variant="ghost" className="h-7 px-2" leftIcon={<UserPlus className="h-3.5 w-3.5" />} onClick={() => setInviteOpen(true)}>
-            Invite
+    <section className="flex min-h-0 flex-1 flex-col" aria-label="Participants">
+      {me.staff && (
+        <div className="border-b border-border px-4 py-3">
+          <Button size="sm" variant="secondary" className="w-full" data-autofocus leftIcon={<UserPlus className="h-3.5 w-3.5" />} onClick={() => setInviteOpen(true)}>
+            Invite people
           </Button>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {me.staff && waiting.length > 0 && (
-          <div className="border-b border-border bg-warning/5 px-3 py-2.5">
+          <div className="border-b border-border bg-warning/8 px-4 py-3">
             <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-xs font-semibold tracking-wide text-warning uppercase">Waiting to join · {waiting.length}</h3>
+              <h3 className="text-xs font-semibold text-warning">Waiting to join · {waiting.length}</h3>
               {waiting.length > 1 && !full && (
-                <button type="button" className="text-xs font-medium text-primary-hover hover:underline" onClick={() => waiting.forEach((request) => decide.mutate({ request, admit: true }))}>
+                <button type="button" className="text-xs font-medium text-primary hover:underline" onClick={() => waiting.forEach(lobby.admit)}>
                   Admit all
                 </button>
               )}
@@ -117,7 +75,7 @@ export function ParticipantsPanel({ realtime, currentUserId }: ParticipantsPanel
                     <p className="truncate text-sm">{request.name}</p>
                     <p className="truncate text-[11px] text-fg-muted">{request.email}</p>
                   </div>
-                  <Button size="sm" variant="ghost" className="h-7 px-2 text-danger" onClick={() => decide.mutate({ request, admit: false })}>
+                  <Button size="sm" variant="ghost" className="h-7 px-2 text-danger" onClick={() => lobby.deny(request)}>
                     Deny
                   </Button>
                   {full ? (
@@ -125,7 +83,7 @@ export function ParticipantsPanel({ realtime, currentUserId }: ParticipantsPanel
                       Room full
                     </span>
                   ) : (
-                    <Button size="sm" className="h-7 px-2.5" onClick={() => decide.mutate({ request, admit: true })}>
+                    <Button size="sm" className="h-7 px-2.5" onClick={() => lobby.admit(request)}>
                       Admit
                     </Button>
                   )}
@@ -135,11 +93,11 @@ export function ParticipantsPanel({ realtime, currentUserId }: ParticipantsPanel
           </div>
         )}
 
-        <ul className="divide-y divide-border">
+        <ul className="divide-y divide-border-subtle">
           {people.map((p) => {
             const isMe = p.userId === currentUserId
             return (
-              <li key={p.userId} className="flex items-center gap-2.5 px-3 py-2.5">
+              <li key={p.userId} className="flex items-center gap-2.5 px-4 py-3">
                 <div className="relative">
                   <Avatar label={p.name} src={p.avatarThumbUrl} size={32} />
                   <span
@@ -202,11 +160,11 @@ export function ParticipantsPanel({ realtime, currentUserId }: ParticipantsPanel
             )
           })}
         </ul>
-        {leftCount > 0 && <p className="px-3 py-2 text-[11px] text-fg-muted">{leftCount} left the interview (they can rejoin without asking).</p>}
+        {leftCount > 0 && <p className="px-4 py-2 text-[11px] text-fg-muted">{leftCount} left the interview (they can rejoin without asking).</p>}
       </div>
 
       {me.host && (
-        <div className="space-y-2 border-t border-border px-3 py-2.5">
+        <div className="space-y-2.5 border-t border-border bg-bg/40 px-4 py-3">
           <label className="flex items-center gap-2 text-xs text-fg-muted">
             <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden />
             <span className="shrink-0">Who can join</span>

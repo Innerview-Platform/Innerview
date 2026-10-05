@@ -1,14 +1,18 @@
 import { lazy, Suspense } from 'react'
-import { createBrowserRouter, Navigate, useParams } from 'react-router-dom'
+import { createBrowserRouter, Navigate, Outlet, useParams } from 'react-router-dom'
+import { useAppSelector } from '@/app/hooks'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AuthLayout } from '@/components/layout/AuthLayout'
 import { PageLoader } from '@/components/feedback/states'
+import { selectIsAuthenticated } from '@/features/auth/slices/authSlice'
+import { NotificationStream } from '@/features/notifications/hooks/useNotifications'
 import { looksLikeRoomCode } from '@/features/room/utils/roomCode'
 import NotFoundPage from '@/pages/NotFoundPage'
 import RouteErrorPage from '@/pages/RouteErrorPage'
 import { GuestRoute, ProtectedRoute } from '@/routes/guards'
 import { paths } from '@/routes/paths'
 
+const LandingPage = lazy(() => import('@/features/landing/pages/LandingPage'))
 const LoginPage = lazy(() => import('@/features/auth/pages/LoginPage'))
 const RegisterPage = lazy(() => import('@/features/auth/pages/RegisterPage'))
 const ForgotPasswordPage = lazy(() => import('@/features/auth/pages/ForgotPasswordPage'))
@@ -19,6 +23,8 @@ const NewInterviewPage = lazy(() => import('@/features/interviews/pages/NewInter
 const InterviewDetailsPage = lazy(() => import('@/features/interviews/pages/InterviewDetailsPage'))
 const InterviewFeedbackPage = lazy(() => import('@/features/feedback/pages/InterviewFeedbackPage'))
 const FeedbackPage = lazy(() => import('@/features/feedback/pages/FeedbackPage'))
+const ProblemsPage = lazy(() => import('@/features/problems/pages/ProblemsPage'))
+const ProblemDetailsPage = lazy(() => import('@/features/problems/pages/ProblemDetailsPage'))
 const ProfilePage = lazy(() => import('@/features/profile/pages/ProfilePage'))
 const PublicProfilePage = lazy(() => import('@/features/profile/pages/PublicProfilePage'))
 const JoinRoomPage = lazy(() => import('@/features/room/pages/JoinRoomPage'))
@@ -35,6 +41,27 @@ function RoomRoute() {
   )
 }
 
+/** App-wide pieces that need the router: the live notification stream (idle when signed out). */
+function RootShell() {
+  return (
+    <>
+      <NotificationStream />
+      <Outlet />
+    </>
+  )
+}
+
+/** `/` is the dashboard when signed in and the landing page otherwise. */
+function HomeRoute() {
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  if (isAuthenticated) return <AppLayout />
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <LandingPage />
+    </Suspense>
+  )
+}
+
 /** Old links (emails, bookmarks) keep working. */
 function LegacyRoomRedirect() {
   const { roomId = '' } = useParams()
@@ -43,8 +70,11 @@ function LegacyRoomRedirect() {
 
 export const router = createBrowserRouter([
   {
+    element: <RootShell />,
     errorElement: <RouteErrorPage />,
     children: [
+      { path: paths.home, element: <HomeRoute />, children: [{ index: true, element: <DashboardPage /> }] },
+
       {
         element: <GuestRoute />,
         children: [
@@ -68,12 +98,13 @@ export const router = createBrowserRouter([
           {
             element: <AppLayout />,
             children: [
-              { index: true, element: <DashboardPage /> },
               { path: paths.interviews, element: <InterviewsPage /> },
               { path: paths.newInterview, element: <NewInterviewPage /> },
               { path: '/interviews/:interviewId', element: <InterviewDetailsPage /> },
               { path: '/interviews/:interviewId/feedback', element: <InterviewFeedbackPage /> },
               { path: paths.feedback, element: <FeedbackPage /> },
+              { path: paths.problems, element: <ProblemsPage /> },
+              { path: '/problems/:slug', element: <ProblemDetailsPage /> },
               { path: paths.settings, element: <ProfilePage /> },
               { path: '/u/:username', element: <PublicProfilePage /> },
               { path: paths.join, element: <JoinRoomPage /> },

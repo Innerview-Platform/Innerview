@@ -13,7 +13,7 @@ interface Item {
   target: CompletenessTarget
 }
 
-export function completenessItems(profile: UserProfile, languageCount: number): Item[] {
+function completenessItems(profile: UserProfile, languageCount: number): Item[] {
   return [
     { label: 'Username, employment and education', done: profile.profile_complete, target: 'form' },
     { label: 'Profile photo', done: Boolean(profile.avatar_url), target: 'photo' },

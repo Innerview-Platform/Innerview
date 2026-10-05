@@ -3,7 +3,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const controlBase = cn(
-  'w-full rounded-lg border border-border bg-elevated text-sm text-fg placeholder:text-fg-muted',
+  'w-full rounded-lg border border-border bg-field text-sm text-fg placeholder:text-fg-muted',
   'transition-[border-color,box-shadow] outline-none',
   'focus:border-primary focus:ring-3 focus:ring-primary/20',
   'aria-invalid:border-danger/70 aria-invalid:focus:ring-danger/20',

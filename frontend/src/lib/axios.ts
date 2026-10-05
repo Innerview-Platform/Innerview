@@ -70,7 +70,8 @@ async function refreshWithLock(): Promise<boolean> {
       return true
     }
     try {
-      const { data } = await apiClient.post<RefreshResponse>('/api/auth/refresh', null, {
+      // No body at all: with `null` axios sends a form Content-Type, which Spring rejects (415) before reading the cookie.
+      const { data } = await apiClient.post<RefreshResponse>('/api/auth/refresh', undefined, {
         skipAuthRefresh: true,
         headers: { Authorization: '' },
       } as RetriableConfig)
@@ -81,13 +82,6 @@ async function refreshWithLock(): Promise<boolean> {
     }
   }
   return typeof navigator !== 'undefined' && navigator.locks ? navigator.locks.request('innerview-session-refresh', run) : run()
-}
-
-/** A valid access token, refreshed first when it's about to expire (for sockets and other clients). */
-export async function getFreshAccessToken(): Promise<string | null> {
-  const auth = store?.getState().auth
-  if (auth?.accessToken && auth.expiresAt && auth.expiresAt - Date.now() > 30_000) return auth.accessToken
-  return (await refreshSession()) ? (store?.getState().auth.accessToken ?? null) : null
 }
 
 apiClient.interceptors.response.use(

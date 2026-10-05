@@ -1,7 +1,7 @@
 import { useId, type ReactElement, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
-export interface FieldControlProps {
+interface FieldControlProps {
   id: string
   'aria-invalid'?: boolean
   'aria-describedby'?: string

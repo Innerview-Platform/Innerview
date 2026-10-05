@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { reviewsApi, type ReviewDirection } from '@/features/feedback/api/reviewsApi'
 
-export const reviewKeys = {
+const reviewKeys = {
   all: ['reviews'] as const,
   list: (direction: ReviewDirection, params: { rating?: number; page: number; size: number }) =>
     [...reviewKeys.all, direction, params] as const,

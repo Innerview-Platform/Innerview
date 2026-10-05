@@ -4,7 +4,7 @@ import { profileKeys } from '@/features/profile/hooks/useProfile'
 import type { InterviewHistoryFilters } from '@/features/interviews/types'
 import type { PageParams } from '@/types/api'
 
-export const interviewKeys = {
+const interviewKeys = {
   history: (userId: string) => [...profileKeys.user(userId), 'interviews'] as const,
   historyPage: (userId: string, params: InterviewHistoryFilters & PageParams) => [...interviewKeys.history(userId), params] as const,
 }

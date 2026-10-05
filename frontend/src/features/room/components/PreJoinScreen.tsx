@@ -3,12 +3,13 @@ import { Link } from 'react-router-dom'
 import { Ban, CalendarClock, DoorOpen, Hourglass, Mic, MicOff, Users, Video, VideoOff } from 'lucide-react'
 import { Button, buttonClasses } from '@/components/common/Button'
 import { LogoMark } from '@/components/common/Logo'
+import { ThemeToggle } from '@/components/common/ThemeToggle'
 import { Select } from '@/components/forms/controls'
 import { INTERVIEW_TYPE_LABELS, labelFor } from '@/constants/enums'
-import type { DevicePreferences } from '@/features/room/components/VideoPanel'
+import { ControlButton } from '@/features/room/components/call/ControlButton'
+import type { DevicePreferences } from '@/features/room/components/call/CallProvider'
 import type { AccessInfo } from '@/features/room/types'
 import { ROOM_ROLE_LABELS } from '@/features/room/utils/labels'
-import { cn } from '@/lib/utils'
 import { paths } from '@/routes/paths'
 
 const PREFS_KEY = 'innerview.devices'
@@ -71,33 +72,32 @@ function DevicePreview({ prefs, onChange, onBlocked }: { prefs: DevicePreference
 
   return (
     <div className="space-y-3">
-      <div className="relative aspect-video overflow-hidden rounded-xl border border-border bg-bg">
+      <div className="relative aspect-video overflow-hidden rounded-xl bg-stage">
         {prefs.video && !error ? (
           <video ref={videoRef} autoPlay playsInline muted className="h-full w-full -scale-x-100 object-cover" />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-sm text-fg-muted">
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-sm text-white/70">
             <VideoOff className="h-6 w-6" aria-hidden />
             {error ?? 'Camera is off'}
           </div>
         )}
-        <div className="absolute inset-x-0 bottom-3 flex justify-center gap-2">
-          <button
-            type="button"
-            onClick={() => onChange({ ...prefs, audio: !prefs.audio })}
-            className={cn('flex h-10 w-10 items-center justify-center rounded-full border', prefs.audio ? 'border-border bg-surface/90' : 'border-danger bg-danger text-white')}
-            aria-label={prefs.audio ? 'Turn microphone off' : 'Turn microphone on'}
-          >
-            {prefs.audio ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
-          </button>
-          <button
-            type="button"
-            onClick={() => onChange({ ...prefs, video: !prefs.video })}
-            className={cn('flex h-10 w-10 items-center justify-center rounded-full border', prefs.video ? 'border-border bg-surface/90' : 'border-danger bg-danger text-white')}
-            aria-label={prefs.video ? 'Turn camera off' : 'Turn camera on'}
-          >
-            {prefs.video ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
-          </button>
-        </div>
+      </div>
+      {/* Below the preview, not on it: nothing covers your face. */}
+      <div className="flex items-center justify-center gap-2">
+        <ControlButton
+          label={prefs.audio ? 'Turn microphone off' : 'Turn microphone on'}
+          icon={prefs.audio ? Mic : MicOff}
+          state={prefs.audio ? 'on' : 'off'}
+          pressed={!prefs.audio}
+          onClick={() => onChange({ ...prefs, audio: !prefs.audio })}
+        />
+        <ControlButton
+          label={prefs.video ? 'Turn camera off' : 'Turn camera on'}
+          icon={prefs.video ? Video : VideoOff}
+          state={prefs.video ? 'on' : 'off'}
+          pressed={!prefs.video}
+          onClick={() => onChange({ ...prefs, video: !prefs.video })}
+        />
       </div>
       {(cameras.length > 1 || microphones.length > 1) && (
         <div className="grid gap-2 sm:grid-cols-2">
@@ -172,10 +172,11 @@ export function PreJoinScreen({ access, onJoin, onKnock, onCancelKnock, busy }: 
 
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
-      <header className="flex h-14 items-center border-b border-border px-4 sm:px-6">
+      <header className="flex h-14 items-center justify-between border-b border-border px-4 sm:px-6">
         <Link to={paths.home} aria-label="Home">
-          <LogoMark size={26} />
+          <LogoMark size={28} />
         </Link>
+        <ThemeToggle />
       </header>
       <main className="mx-auto grid w-full max-w-5xl flex-1 items-center gap-8 px-4 py-8 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:px-6">
         <div>{showDevices ? <DevicePreview prefs={prefs} onChange={changePrefs} onBlocked={setDevicesBlocked} /> : null}</div>
@@ -183,7 +184,7 @@ export function PreJoinScreen({ access, onJoin, onKnock, onCancelKnock, busy }: 
         <div className="space-y-5 text-center lg:text-left">
           <div>
             <p className="font-mono text-xs tracking-wider text-fg-muted">{access.displayCode}</p>
-            <h1 className="mt-1 text-2xl font-semibold">{access.title || `${labelFor(INTERVIEW_TYPE_LABELS, access.type)} interview`}</h1>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">{access.title || `${labelFor(INTERVIEW_TYPE_LABELS, access.type)} interview`}</h1>
             {access.hostName && <p className="mt-1 text-sm text-fg-muted">Hosted by {access.hostName}</p>}
           </div>
 
@@ -219,7 +220,7 @@ export function PreJoinScreen({ access, onJoin, onKnock, onCancelKnock, busy }: 
           {access.access === 'PENDING' && (
             <div className="space-y-3">
               <p className="flex items-center justify-center gap-2 text-sm lg:justify-start">
-                <Hourglass className="h-4 w-4 animate-pulse text-primary-hover" aria-hidden /> Asking to be let in…
+                <Hourglass className="h-4 w-4 animate-pulse text-primary" aria-hidden /> Asking to be let in…
               </p>
               <p className="text-xs text-fg-muted">You’ll join automatically once someone admits you. If nobody answers within 10 minutes, you can ask again.</p>
               <Button variant="secondary" onClick={onCancelKnock}>
@@ -231,7 +232,7 @@ export function PreJoinScreen({ access, onJoin, onKnock, onCancelKnock, busy }: 
           {access.access === 'NOT_STARTED' && access.startTime && (
             <div className="space-y-2">
               <p className="flex items-center justify-center gap-2 text-sm lg:justify-start">
-                <CalendarClock className="h-4 w-4 text-primary-hover" aria-hidden />
+                <CalendarClock className="h-4 w-4 text-primary" aria-hidden />
                 Starts {new Date(access.startTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
               </p>
               {access.joinOpensAt && (
