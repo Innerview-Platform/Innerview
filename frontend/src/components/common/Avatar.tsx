@@ -1,14 +1,8 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
-const GRADIENTS = [
-  'from-indigo-500 to-violet-500',
-  'from-violet-500 to-fuchsia-500',
-  'from-sky-500 to-indigo-500',
-  'from-emerald-500 to-teal-500',
-  'from-amber-500 to-orange-500',
-  'from-pink-500 to-rose-500',
-]
+/** Indigo/violet-family tones (plus a few warm ones) that read well with white initials in both themes. */
+const TONES = ['#6366f1', '#7c3aed', '#4f6aa8', '#9333ea', '#4338ca', '#a2445b', '#b2593a', '#6d28d9']
 
 function initialsFor(label: string) {
   const base = label.split('@')[0] ?? label
@@ -28,16 +22,15 @@ interface AvatarProps {
 export function Avatar({ label, src, size = 36, className }: AvatarProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null)
   const showImage = Boolean(src) && failedSrc !== src
-  const gradient = GRADIENTS[[...label].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % GRADIENTS.length]
+  const tone = TONES[[...label].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % TONES.length]
 
   return (
     <span
       className={cn(
-        'relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full bg-gradient-to-br font-semibold text-white',
-        gradient,
+        'relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full font-semibold text-white',
         className,
       )}
-      style={{ width: size, height: size, fontSize: Math.max(10, size * 0.36) }}
+      style={{ width: size, height: size, fontSize: Math.max(10, size * 0.36), backgroundColor: tone }}
       aria-hidden
     >
       {showImage ? (

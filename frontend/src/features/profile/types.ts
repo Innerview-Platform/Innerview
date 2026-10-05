@@ -90,9 +90,3 @@ export interface AvatarUrls {
   avatar_thumb_url: string | null
 }
 
-/** UserAverageRatingResponse */
-export interface UserRating {
-  user_id: string
-  average_rating: number
-  total_reviews: number
-}

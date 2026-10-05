@@ -6,14 +6,14 @@ export type HireSignal = 'STRONG_NO' | 'NO' | 'LEAN_NO' | 'LEAN_YES' | 'YES' | '
 export type ReviewDirection = 'received' | 'given'
 
 /** The other person: the reviewer (received) or the reviewee (given). */
-export interface ReviewPerson {
+interface ReviewPerson {
   user_id: string
   username: string | null
   name: string
   avatar_thumb_url: string | null
 }
 
-export interface ReviewInterview {
+interface ReviewInterview {
   id: number
   title: string | null
   type: InterviewType | null

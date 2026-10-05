@@ -35,11 +35,7 @@ export function ConfirmDialog({
           <Button variant="secondary" onClick={onCancel} disabled={loading} data-autofocus>
             Cancel
           </Button>
-          <Button
-            className={tone === 'danger' ? 'bg-danger shadow-danger/20 hover:bg-danger/85' : undefined}
-            onClick={onConfirm}
-            loading={loading}
-          >
+          <Button variant={tone === 'danger' ? 'destructive' : 'primary'} onClick={onConfirm} loading={loading}>
             {confirmLabel}
           </Button>
         </>

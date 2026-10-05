@@ -5,5 +5,3 @@ dist
 *.md
 .env
 .env.*
-legacy-prototype
-.bob-probe.mjs

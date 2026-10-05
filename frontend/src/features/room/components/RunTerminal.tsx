@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { CornerDownLeft, Eraser, SquareTerminal } from 'lucide-react'
 import { Badge, type BadgeTone } from '@/components/common/Badge'
 import { Button } from '@/components/common/Button'
@@ -24,10 +24,12 @@ const CHUNK_CLASSES: Record<TerminalChunkKind, string> = {
 interface RunTerminalProps {
   runner: Pick<CodeRunner, 'phase' | 'runtime' | 'chunks' | 'sendInput' | 'clear'>
   connected: boolean
+  /** Replaces the "Terminal" title (e.g. with Terminal / Tests tabs). */
+  headerStart?: ReactNode
 }
 
 /** Shared output console. While a program runs, anything typed here is sent to its stdin. */
-export function RunTerminal({ runner, connected }: RunTerminalProps) {
+export function RunTerminal({ runner, connected, headerStart }: RunTerminalProps) {
   const { phase, runtime, chunks, sendInput, clear } = runner
   const [input, setInput] = useState('')
   const outputRef = useRef<HTMLDivElement>(null)
@@ -57,8 +59,12 @@ export function RunTerminal({ runner, connected }: RunTerminalProps) {
     <section className="flex h-full min-h-0 flex-col bg-bg" aria-label="Run output">
       <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-1.5">
         <div className="flex min-w-0 items-center gap-2">
-          <SquareTerminal className="h-4 w-4 shrink-0 text-fg-muted" aria-hidden />
-          <h3 className="text-[13px] font-semibold">Terminal</h3>
+          {headerStart ?? (
+            <>
+              <SquareTerminal className="h-4 w-4 shrink-0 text-fg-muted" aria-hidden />
+              <h3 className="text-[13px] font-semibold">Terminal</h3>
+            </>
+          )}
           <Badge tone={badge.tone}>
             {phase !== 'idle' && <Spinner size="sm" className="h-2.5 w-2.5 border" />}
             {badge.label}

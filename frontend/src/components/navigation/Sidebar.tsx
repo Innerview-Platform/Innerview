@@ -2,9 +2,11 @@ import { Link, NavLink } from 'react-router-dom'
 import { LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { Avatar } from '@/components/common/Avatar'
-import { LogoMark } from '@/components/common/Logo'
+import { LogoMark, Wordmark } from '@/components/common/Logo'
+import { ThemeToggle } from '@/components/common/ThemeToggle'
 import { primaryNav } from '@/components/navigation/navItems'
 import { useLogout } from '@/features/auth/hooks/useAuthMutations'
+import { NotificationBell } from '@/features/notifications/components/NotificationBell'
 import { selectCurrentUser } from '@/features/auth/slices/authSlice'
 import { useMyProfile } from '@/features/profile/hooks/useProfile'
 import { mobileNavClosed, selectSidebarCollapsed, sidebarToggled } from '@/store/uiSlice'
@@ -33,21 +35,25 @@ export function Sidebar({ variant = 'desktop' }: SidebarProps) {
       <div className={cn('flex h-16 items-center border-b border-border', collapsed ? 'justify-center px-2' : 'justify-between px-4')}>
         <Link to={paths.home} onClick={closeMobile} className="flex items-center gap-2" aria-label="InnerView dashboard">
           <LogoMark size={28} />
-          {!collapsed && <span className="text-base font-bold tracking-tight">InnerView</span>}
+          {!collapsed && <Wordmark />}
         </Link>
         {variant === 'desktop' && !collapsed && (
-          <button
-            onClick={() => dispatch(sidebarToggled())}
-            className="rounded-md p-1.5 text-fg-muted hover:bg-elevated hover:text-fg"
-            aria-label="Collapse sidebar"
-          >
-            <PanelLeftClose className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-0.5">
+            <NotificationBell />
+            <button
+              onClick={() => dispatch(sidebarToggled())}
+              className="rounded-md p-1.5 text-fg-muted hover:bg-elevated hover:text-fg"
+              aria-label="Collapse sidebar"
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </button>
+          </div>
         )}
       </div>
 
       {collapsed && (
-        <div className="flex justify-center py-2">
+        <div className="flex flex-col items-center gap-1 py-2">
+          <NotificationBell />
           <button
             onClick={() => dispatch(sidebarToggled())}
             className="rounded-md p-1.5 text-fg-muted hover:bg-elevated hover:text-fg"
@@ -68,9 +74,11 @@ export function Sidebar({ variant = 'desktop' }: SidebarProps) {
             title={collapsed ? label : undefined}
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                'relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 collapsed && 'justify-center px-2',
-                isActive ? 'bg-primary/15 text-primary-hover' : 'text-fg-secondary hover:bg-elevated hover:text-fg',
+                isActive
+                  ? 'bg-elevated text-fg before:absolute before:inset-y-2 before:-left-2 before:w-[3px] before:rounded-r-full before:bg-primary [&>svg]:text-primary'
+                  : 'text-fg-secondary hover:bg-elevated/70 hover:text-fg',
               )
             }
           >
@@ -82,6 +90,7 @@ export function Sidebar({ variant = 'desktop' }: SidebarProps) {
       </nav>
 
       <div className="border-t border-border p-2">
+        {collapsed ? <ThemeToggle className="mx-auto mb-1" /> : <ThemeToggle variant="segmented" className="mx-1 mb-2" />}
         <Link
           to={paths.settings}
           onClick={closeMobile}

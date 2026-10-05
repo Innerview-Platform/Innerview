@@ -1,7 +1,7 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
-import { FileText, LayoutPanelLeft, MessageSquare, PanelLeft, PanelRight, Users, Video, type LucideIcon } from 'lucide-react'
+import { FileText, LayoutPanelLeft, MessageSquare, PanelLeft, PanelRight, PhoneOff, Users, Video, type LucideIcon } from 'lucide-react'
 import { Group, Panel, useDefaultLayout, usePanelRef } from 'react-resizable-panels'
 import { toast } from 'sonner'
 import { useAppSelector } from '@/app/hooks'
@@ -12,32 +12,39 @@ import { ConfirmDialog } from '@/components/modals/ConfirmDialog'
 import { Modal } from '@/components/modals/Modal'
 import { selectAccessToken, selectCurrentUser } from '@/features/auth/slices/authSlice'
 import { roomApi } from '@/features/room/api/roomApi'
+import { CallControls } from '@/features/room/components/call/CallControls'
+import { CallProvider, type DevicePreferences } from '@/features/room/components/call/CallProvider'
+import { VideoStage } from '@/features/room/components/call/VideoStage'
 import { ChatPanel } from '@/features/room/components/ChatPanel'
 import { layoutStorage } from '@/features/room/components/layout/layoutStorage'
 import { ResizeHandle } from '@/features/room/components/layout/ResizeHandle'
 import { ParticipantsPanel } from '@/features/room/components/ParticipantsPanel'
 import { RoomHeader } from '@/features/room/components/RoomHeader'
-import type { DevicePreferences } from '@/features/room/components/VideoPanel'
+import { RoomPopover } from '@/features/room/components/RoomPopover'
 import { WorkspaceTabs, type WorkspaceTab } from '@/features/room/components/WorkspaceTabs'
+import { useCollabDocument } from '@/features/room/hooks/useCollabDocument'
+import { useLobby } from '@/features/room/hooks/useLobby'
+import { useRoomChat } from '@/features/room/hooks/useRoomChat'
 import { useRoomRealtime } from '@/features/room/hooks/useRoomRealtime'
+import { useSharedProblem } from '@/features/room/hooks/useSharedProblem'
 import type { JoinResult, RoomUiConfig } from '@/features/room/types'
 import { ROOM_ROLE_LABELS } from '@/features/room/utils/labels'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { getErrorMessage } from '@/lib/apiError'
+import { setToasterPlacement } from '@/lib/toaster'
 import { cn } from '@/lib/utils'
 import { paths } from '@/routes/paths'
 
-// Heavy dependencies (CodeMirror, Excalidraw, LiveKit) load only inside the room.
+// Heavy dependencies (CodeMirror, Excalidraw) load only inside the room.
 const ProblemPanel = lazy(() => import('@/features/room/components/ProblemPanel').then((m) => ({ default: m.ProblemPanel })))
 const CodeEditorPanel = lazy(() => import('@/features/room/components/CodeEditorPanel').then((m) => ({ default: m.CodeEditorPanel })))
 const SharedCanvasPanel = lazy(() => import('@/features/room/components/SharedCanvasPanel').then((m) => ({ default: m.SharedCanvasPanel })))
-const VideoPanel = lazy(() => import('@/features/room/components/VideoPanel').then((m) => ({ default: m.VideoPanel })))
 
 /** System-design rooms open on the whiteboard; everything else opens on the code editor. */
 const defaultTab = (uiConfig: RoomUiConfig): WorkspaceTab => (uiConfig.showSystemCanvas && !uiConfig.showSharedEditor ? 'whiteboard' : 'code')
 
 type MobileView = 'problem' | 'workspace' | 'call'
-type SideTab = 'people' | 'chat'
+type Popup = 'people' | 'chat'
 
 const MOBILE_VIEWS: { id: MobileView; label: string; icon: LucideIcon }[] = [
   { id: 'problem', label: 'Problem', icon: FileText },
@@ -47,26 +54,55 @@ const MOBILE_VIEWS: { id: MobileView; label: string; icon: LucideIcon }[] = [
 
 function PanelFallback({ className }: { className?: string }) {
   return (
-    <div className={`flex items-center justify-center rounded-xl border border-border bg-surface text-fg-muted ${className ?? ''}`}>
+    <div className={cn('flex items-center justify-center rounded-xl border border-border bg-surface text-fg-muted', className)}>
       <Spinner />
     </div>
   )
 }
 
+/** Shows or hides one of the side panels (desktop). */
 function PanelToggle({ icon: Icon, label, pressed, onClick }: { icon: LucideIcon; label: string; pressed: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={pressed}
-      title={`${pressed ? 'Hide' : 'Show'} ${label.toLowerCase()} panel`}
+      title={`${pressed ? 'Hide' : 'Show'} ${label.toLowerCase()}`}
       className={cn(
-        'flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium transition-colors',
-        pressed ? 'bg-elevated text-fg' : 'text-fg-muted hover:bg-elevated hover:text-fg',
+        'flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium transition-colors',
+        pressed ? 'text-fg hover:bg-elevated' : 'text-fg-muted hover:bg-elevated hover:text-fg',
       )}
     >
-      <Icon className="h-4 w-4" aria-hidden />
-      {label}
+      <Icon className={cn('h-4 w-4', pressed && 'text-primary')} aria-hidden />
+      <span className="hidden xl:inline">{label}</span>
+    </button>
+  )
+}
+
+/** People / Chat buttons in the control bar; the count turns into a badge when something needs attention. */
+function PopupToggle({ icon: Icon, label, count, alert, pressed, onClick }: { icon: LucideIcon; label: string; count?: number; alert?: number; pressed: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      data-popover-trigger
+      onClick={onClick}
+      aria-expanded={pressed}
+      aria-label={`${label}${alert ? ` (${alert} new)` : ''}`}
+      title={label}
+      className={cn(
+        'relative flex h-10 items-center gap-2 rounded-full px-3 text-[13px] font-medium transition-colors md:px-3.5',
+        pressed ? 'bg-primary/15 text-fg ring-1 ring-primary/35' : 'bg-elevated text-fg hover:bg-border',
+      )}
+    >
+      <Icon className={cn('h-[18px] w-[18px]', pressed && 'text-primary')} aria-hidden />
+      <span className="hidden md:inline">{label}</span>
+      {alert ? (
+        <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-semibold text-on-primary ring-2 ring-surface md:static md:ring-0">
+          {alert}
+        </span>
+      ) : (
+        count !== undefined && <span className="hidden text-fg-muted tabular-nums md:inline">{count}</span>
+      )}
     </button>
   )
 }
@@ -96,7 +132,14 @@ export function InterviewRoom({ joined, devices, takeover, onRejoin }: Interview
   })
   const { room, me } = realtime
   const myName = room.participants.find((p) => p.userId === authUser.id)?.name ?? authUser.email.split('@')[0]
-  const user = { id: authUser.id, name: myName }
+  const user = useMemo(() => ({ id: authUser.id, name: myName }), [authUser.id, myName])
+  const people = useMemo(() => new Map(room.participants.map((p) => [p.userId, p])), [room.participants])
+  const present = room.participants.filter((p) => p.status !== 'LEFT').length
+  const inviteLink = `${window.location.origin}${paths.room(code)}`
+
+  // The shared problem document, used by the problem panel and (for the selected library problem) the editor.
+  const problemDoc = useCollabDocument({ code, kind: 'notes', fetchTicket: realtime.fetchTicket, user })
+  const sharedProblem = useSharedProblem(problemDoc.doc, problemDoc.text)
 
   // ── layout ───────────────────────────────────────────────────────────────
   const isDesktop = useMediaQuery('(min-width: 1024px)')
@@ -105,14 +148,37 @@ export function InterviewRoom({ joined, devices, takeover, onRejoin }: Interview
   const [whiteboardMounted, setWhiteboardMounted] = useState(false)
   if (activeTab === 'whiteboard' && !whiteboardMounted) setWhiteboardMounted(true)
   const [mobileView, setMobileView] = useState<MobileView>('workspace')
-  const [sideTab, setSideTab] = useState<SideTab>('people')
-  const [unread, setUnread] = useState(0)
 
   const problemPanel = usePanelRef()
   const callPanel = usePanelRef()
-  const roomLayout = useDefaultLayout({ id: 'innerview-room-layout', storage: layoutStorage })
+  const roomLayout = useDefaultLayout({ id: 'innerview-room-layout-v2', storage: layoutStorage })
   const [problemOpen, setProblemOpen] = useState(() => (roomLayout.defaultLayout?.problem ?? 1) > 0)
   const [callOpen, setCallOpen] = useState(() => (roomLayout.defaultLayout?.call ?? 1) > 0)
+  const togglePanel = (panel: typeof problemPanel, open: boolean) => (open ? panel.current?.collapse() : panel.current?.expand())
+
+  // Popups open beside the video column rather than over it (column + room padding + resize gap).
+  const [videoColumnWidth, setVideoColumnWidth] = useState(0)
+  const popoverRight = isDesktop && videoColumnWidth > 0 ? videoColumnWidth + 12 + 10 : undefined
+
+  // ── chat & people (popups) ───────────────────────────────────────────────
+  const [popup, setPopup] = useState<Popup | null>(null)
+  const togglePopup = (next: Popup) => setPopup((current) => (current === next ? null : next))
+  const lobby = useLobby(realtime)
+  const chat = useRoomChat(realtime, user.id, {
+    open: popup === 'chat',
+    onIncoming: (message) =>
+      toast(message.senderName, {
+        id: `chat-${message.id}`,
+        description: message.text.length > 140 ? `${message.text.slice(0, 140)}…` : message.text,
+        action: { label: 'Reply', onClick: () => setPopup('chat') },
+      }),
+  })
+
+  // Toasts move under the header while the room is open.
+  useEffect(() => {
+    setToasterPlacement('room')
+    return () => setToasterPlacement('app')
+  }, [])
 
   // ── leaving ──────────────────────────────────────────────────────────────
   const leftRef = useRef(false)
@@ -165,7 +231,8 @@ export function InterviewRoom({ joined, devices, takeover, onRejoin }: Interview
     },
   })
 
-  const onLeaveClick = () => (me.host ? setLeaveDialog(true) : leave.mutate())
+  // Host and interviewers can also end the interview from here (on phones it's the only place).
+  const onLeaveClick = () => (me.staff ? setLeaveDialog(true) : leave.mutate())
 
   // ── server events ────────────────────────────────────────────────────────
   const endingLocally = endInterview.isPending || endInterview.isSuccess
@@ -209,7 +276,12 @@ export function InterviewRoom({ joined, devices, takeover, onRejoin }: Interview
   // Another tab took over this user's seat ("Join here").
   if (realtime.session?.type === 'REPLACED') {
     return (
-      <Modal open onClose={() => exit(paths.home)} title="You joined from another tab" description="This interview is open in another tab or device, so this one was disconnected." dismissible={false}
+      <Modal
+        open
+        onClose={() => exit(paths.home)}
+        title="You joined from another tab"
+        description="This interview is open in another tab or device, so this one was disconnected."
+        dismissible={false}
         footer={
           <>
             <Button variant="secondary" onClick={() => exit(paths.home)}>
@@ -222,12 +294,12 @@ export function InterviewRoom({ joined, devices, takeover, onRejoin }: Interview
     )
   }
 
-  // ── panels ───────────────────────────────────────────────────────────────
+  // ── zones ────────────────────────────────────────────────────────────────
   const tabs = <WorkspaceTabs value={activeTab} onChange={setTab} />
 
   const problem = (
     <Suspense fallback={<PanelFallback className="h-full" />}>
-      <ProblemPanel realtime={realtime} user={user} />
+      <ProblemPanel realtime={realtime} user={user} problemDoc={problemDoc} shared={sharedProblem} />
     </Suspense>
   )
 
@@ -235,7 +307,7 @@ export function InterviewRoom({ joined, devices, takeover, onRejoin }: Interview
     <div className="h-full min-h-0">
       <div className={cn('h-full', activeTab !== 'code' && 'hidden')}>
         <Suspense fallback={<PanelFallback className="h-full" />}>
-          <CodeEditorPanel realtime={realtime} user={user} header={tabs} />
+          <CodeEditorPanel realtime={realtime} user={user} header={tabs} problem={sharedProblem.problem} />
         </Suspense>
       </div>
       {whiteboardMounted && (
@@ -248,53 +320,83 @@ export function InterviewRoom({ joined, devices, takeover, onRejoin }: Interview
     </div>
   )
 
-  const call = (
-    <aside className="flex h-full min-h-0 flex-col gap-3" aria-label="Call, people and chat">
-      <Suspense fallback={<PanelFallback className="aspect-video" />}>
-        <VideoPanel roomId={code} devices={devices} />
-      </Suspense>
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface">
-        <div role="tablist" className="flex shrink-0 gap-1 border-b border-border p-1.5">
-          {(
-            [
-              { id: 'people', label: 'People', icon: Users, badge: 0 },
-              { id: 'chat', label: 'Chat', icon: MessageSquare, badge: unread },
-            ] as const
-          ).map(({ id, label, icon: Icon, badge }) => (
+  let body: ReactNode
+  if (isDesktop) {
+    body = (
+      <Group
+        orientation="horizontal"
+        id="innerview-room-layout-v2"
+        className="min-h-0 flex-1 px-3 pt-3"
+        defaultLayout={roomLayout.defaultLayout}
+        onLayoutChanged={roomLayout.onLayoutChanged}
+      >
+        <Panel id="problem" panelRef={problemPanel} collapsible collapsedSize="0%" defaultSize="22%" minSize="260px" maxSize="40%" onResize={(size) => setProblemOpen(size.asPercentage > 0)}>
+          {problem}
+        </Panel>
+        <ResizeHandle />
+        <Panel id="workspace" minSize="35%">
+          {workspace}
+        </Panel>
+        <ResizeHandle />
+        <Panel
+          id="call"
+          panelRef={callPanel}
+          collapsible
+          collapsedSize="0%"
+          defaultSize="22%"
+          minSize="240px"
+          maxSize="38%"
+          onResize={(size) => {
+            setCallOpen(size.asPercentage > 0)
+            setVideoColumnWidth(Math.round(size.inPixels))
+          }}
+        >
+          <VideoStage variant="column" people={people} selfId={user.id} inviteLink={inviteLink} />
+        </Panel>
+      </Group>
+    )
+  } else {
+    body = (
+      <>
+        <nav className="flex shrink-0 gap-1 border-b border-border bg-surface px-3 py-2" aria-label="Room views">
+          {MOBILE_VIEWS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               type="button"
-              role="tab"
-              aria-selected={sideTab === id}
-              onClick={() => {
-                setSideTab(id)
-                if (id === 'chat') setUnread(0)
-              }}
+              onClick={() => setMobileView(id)}
+              aria-current={mobileView === id ? 'page' : undefined}
               className={cn(
-                'flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md text-[13px] font-medium',
-                sideTab === id ? 'bg-elevated text-fg' : 'text-fg-muted hover:text-fg',
+                'flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg text-[13px] font-medium transition-colors',
+                mobileView === id ? 'bg-elevated text-fg' : 'text-fg-muted hover:text-fg',
               )}
             >
-              <Icon className="h-3.5 w-3.5" aria-hidden />
+              <Icon className={cn('h-4 w-4', mobileView === id && 'text-primary')} aria-hidden />
               {label}
-              {badge > 0 && <span className="rounded-full bg-primary px-1.5 text-[10px] text-white">{badge}</span>}
             </button>
           ))}
+        </nav>
+        {/* Problem and workspace stay mounted so documents and the whiteboard keep syncing in the background. */}
+        <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
+          {mobileView !== 'call' && (
+            // Faces stay in view while you work: a strip of small tiles above the content.
+            <div className="h-[92px] shrink-0">
+              <VideoStage variant="strip" people={people} selfId={user.id} inviteLink={inviteLink} />
+            </div>
+          )}
+          <div className={cn('min-h-0 flex-1', mobileView !== 'problem' && 'hidden')}>{problem}</div>
+          <div className={cn('min-h-0 flex-1', mobileView !== 'workspace' && 'hidden')}>{workspace}</div>
+          {mobileView === 'call' && (
+            <div className="min-h-0 flex-1">
+              <VideoStage variant="grid" people={people} selfId={user.id} inviteLink={inviteLink} />
+            </div>
+          )}
         </div>
-        <div className={cn('flex min-h-0 flex-1 flex-col', sideTab !== 'people' && 'hidden')}>
-          <ParticipantsPanel realtime={realtime} currentUserId={user.id} />
-        </div>
-        <div className={cn('flex min-h-0 flex-1 flex-col', sideTab !== 'chat' && 'hidden')}>
-          <ChatPanel realtime={realtime} currentUserId={user.id} onUnread={() => sideTab !== 'chat' && setUnread((n) => n + 1)} />
-        </div>
-      </div>
-    </aside>
-  )
-
-  const togglePanel = (panel: typeof problemPanel, open: boolean) => (open ? panel.current?.collapse() : panel.current?.expand())
+      </>
+    )
+  }
 
   return (
-    <div className="flex h-dvh flex-col bg-bg">
+    <CallProvider roomId={code} devices={devices} className="flex h-dvh flex-col bg-bg [--room-bar-height:4.25rem]">
       <RoomHeader
         code={code}
         title={room.title}
@@ -303,30 +405,84 @@ export function InterviewRoom({ joined, devices, takeover, onRejoin }: Interview
         canExtend={me.host && !room.extended}
         onExtend={() => roomApi.extend(code).catch((error) => toast.error("Couldn't extend", { description: getErrorMessage(error) }))}
         onReconnect={realtime.reconnect}
-        onLeave={onLeaveClick}
-        leaving={leave.isPending}
-        onEnd={me.staff ? () => setEndDialog(true) : undefined}
+      />
+
+      {realtime.status === 'failed' && (
+        <Alert tone="danger" className="mx-3 mt-3" title="Real-time connection lost">
+          {realtime.failureReason?.includes('not-a-member') || realtime.failureReason?.includes('room-closed')
+            ? "You're no longer in this interview."
+            : 'Code runs, chat and participant updates are paused. Try reconnecting.'}
+        </Alert>
+      )}
+
+      {body}
+
+      {/* Control bar: its own row, so call controls never cover faces, code or the whiteboard. */}
+      <footer
+        className="flex h-[var(--room-bar-height)] shrink-0 items-center justify-between gap-2 px-3 sm:px-4 lg:grid lg:grid-cols-[1fr_auto_1fr]"
+        aria-label="Call controls"
       >
         {isDesktop && (
-          <div className="mr-1 flex items-center gap-1 border-r border-border pr-3">
+          <div className="flex min-w-0 items-center gap-1">
             <PanelToggle icon={PanelLeft} label="Problem" pressed={problemOpen} onClick={() => togglePanel(problemPanel, problemOpen)} />
-            <PanelToggle icon={PanelRight} label="Call" pressed={callOpen} onClick={() => togglePanel(callPanel, callOpen)} />
+            <PanelToggle icon={PanelRight} label="Video" pressed={callOpen} onClick={() => togglePanel(callPanel, callOpen)} />
           </div>
         )}
-      </RoomHeader>
 
-      {/* Host leaving: keep the interview going (host rights pass on) or end it for everyone. */}
+        <div className="flex items-center gap-2">
+          <CallControls />
+          <Button
+            variant="destructive"
+            className="h-10 rounded-full px-3.5 sm:px-4"
+            onClick={onLeaveClick}
+            loading={leave.isPending}
+            leftIcon={<PhoneOff className="h-4 w-4" />}
+            aria-label="Leave the interview"
+          >
+            <span className="hidden sm:inline">Leave</span>
+          </Button>
+        </div>
+
+        <div className="flex min-w-0 items-center justify-end gap-1.5 sm:gap-2">
+          <PopupToggle icon={Users} label="People" count={present} alert={lobby.waiting.length || undefined} pressed={popup === 'people'} onClick={() => togglePopup('people')} />
+          <PopupToggle icon={MessageSquare} label="Chat" alert={chat.unread || undefined} pressed={popup === 'chat'} onClick={() => togglePopup('chat')} />
+          {me.staff && isDesktop && (
+            <Button variant="danger" className="ml-1 h-10 rounded-full" onClick={() => setEndDialog(true)} title="End and save the interview for everyone">
+              End interview
+            </Button>
+          )}
+        </div>
+      </footer>
+
+      <RoomPopover
+        open={popup === 'people'}
+        onClose={() => setPopup(null)}
+        rightOffset={popoverRight}
+        title="People"
+        meta={room.maxParticipants > 0 ? `${present} of ${room.maxParticipants}` : present}
+      >
+        <ParticipantsPanel realtime={realtime} lobby={lobby} currentUserId={user.id} />
+      </RoomPopover>
+      <RoomPopover open={popup === 'chat'} onClose={() => setPopup(null)} rightOffset={popoverRight} title="Chat">
+        <ChatPanel chat={chat} currentUserId={user.id} />
+      </RoomPopover>
+
+      {/* Leaving as host or interviewer: keep the interview going or end it for everyone. */}
       <Modal
         open={leaveDialog}
         onClose={() => setLeaveDialog(false)}
         title="Leave the interview?"
-        description="You can leave and let the others continue — host controls pass to an interviewer — or end it for everyone."
+        description={
+          me.host
+            ? 'You can leave and let the others continue — host controls pass to an interviewer — or end it for everyone.'
+            : 'You can leave and let the others continue, or end it for everyone.'
+        }
         footer={
           <>
             <Button variant="secondary" onClick={() => leave.mutate()} loading={leave.isPending}>
               Leave
             </Button>
-            <Button className="bg-danger hover:bg-danger/85" onClick={() => endInterview.mutate()} loading={endInterview.isPending}>
+            <Button variant="destructive" onClick={() => endInterview.mutate()} loading={endInterview.isPending}>
               End for everyone
             </Button>
           </>
@@ -342,56 +498,6 @@ export function InterviewRoom({ joined, devices, takeover, onRejoin }: Interview
         onConfirm={() => endInterview.mutate()}
         onCancel={() => setEndDialog(false)}
       />
-
-      {realtime.status === 'failed' && (
-        <Alert tone="danger" className="mx-3 mt-3" title="Real-time connection lost">
-          {realtime.failureReason?.includes('not-a-member') || realtime.failureReason?.includes('room-closed')
-            ? "You're no longer in this interview."
-            : 'Code runs, chat and participant updates are paused. Try reconnecting.'}
-        </Alert>
-      )}
-
-      {isDesktop ? (
-        <Group orientation="horizontal" id="innerview-room-layout" className="min-h-0 flex-1 p-3" defaultLayout={roomLayout.defaultLayout} onLayoutChanged={roomLayout.onLayoutChanged}>
-          <Panel id="problem" panelRef={problemPanel} collapsible collapsedSize="0%" defaultSize="20%" minSize="240px" maxSize="40%" onResize={(size) => setProblemOpen(size.asPercentage > 0)}>
-            {problem}
-          </Panel>
-          <ResizeHandle />
-          <Panel id="workspace" minSize="40%">
-            {workspace}
-          </Panel>
-          <ResizeHandle />
-          <Panel id="call" panelRef={callPanel} collapsible collapsedSize="0%" defaultSize="24%" minSize="280px" maxSize="40%" onResize={(size) => setCallOpen(size.asPercentage > 0)}>
-            {call}
-          </Panel>
-        </Group>
-      ) : (
-        <>
-          <nav className="flex shrink-0 gap-1 border-b border-border px-3 py-2" aria-label="Room views">
-            {MOBILE_VIEWS.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setMobileView(id)}
-                aria-current={mobileView === id ? 'page' : undefined}
-                className={cn(
-                  'flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg text-[13px] font-medium transition-colors',
-                  mobileView === id ? 'bg-elevated text-fg' : 'text-fg-muted hover:text-fg',
-                )}
-              >
-                <Icon className="h-4 w-4" aria-hidden />
-                {label}
-              </button>
-            ))}
-          </nav>
-          {/* All views stay mounted so the call, documents and whiteboard keep running in the background. */}
-          <div className="min-h-0 flex-1 p-3">
-            <div className={cn('h-full', mobileView !== 'problem' && 'hidden')}>{problem}</div>
-            <div className={cn('h-full', mobileView !== 'workspace' && 'hidden')}>{workspace}</div>
-            <div className={cn('h-full', mobileView !== 'call' && 'hidden')}>{call}</div>
-          </div>
-        </>
-      )}
-    </div>
+    </CallProvider>
   )
 }

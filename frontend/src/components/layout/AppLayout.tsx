@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { Logo } from '@/components/common/Logo'
 import { PageLoader } from '@/components/feedback/states'
 import { Sidebar } from '@/components/navigation/Sidebar'
+import { NotificationBell } from '@/features/notifications/components/NotificationBell'
 import { mobileNavClosed, mobileNavOpened, selectMobileNavOpen, selectSidebarCollapsed } from '@/store/uiSlice'
 import { cn } from '@/lib/utils'
 import { paths } from '@/routes/paths'
@@ -46,19 +47,22 @@ export function AppLayout() {
         <Link to={paths.home}>
           <Logo size={26} />
         </Link>
-        <button
-          onClick={() => dispatch(mobileNavOpened())}
-          className="rounded-md p-2 text-fg-secondary hover:bg-elevated hover:text-fg"
-          aria-label="Open navigation"
-          aria-expanded={mobileOpen}
-        >
-          <Menu className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <NotificationBell placement="below" />
+          <button
+            onClick={() => dispatch(mobileNavOpened())}
+            className="rounded-md p-2 text-fg-secondary hover:bg-elevated hover:text-fg"
+            aria-label="Open navigation"
+            aria-expanded={mobileOpen}
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
-          <div className="absolute inset-0 bg-black/60" onClick={() => dispatch(mobileNavClosed())} aria-hidden />
+          <div className="absolute inset-0 bg-overlay" onClick={() => dispatch(mobileNavClosed())} aria-hidden />
           <div className="absolute inset-y-0 left-0 w-72 max-w-[85%] animate-fade-in border-r border-border bg-surface">
             <button
               onClick={() => dispatch(mobileNavClosed())}

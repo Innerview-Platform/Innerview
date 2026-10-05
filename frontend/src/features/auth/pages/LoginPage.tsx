@@ -6,6 +6,7 @@ import { Alert } from '@/components/feedback/Alert'
 import { FormField } from '@/components/forms/FormField'
 import { PasswordInput, TextInput } from '@/components/forms/controls'
 import { AuthHeading } from '@/components/layout/AuthLayout'
+import { GoogleSignIn } from '@/features/auth/components/GoogleSignIn'
 import { useLogin } from '@/features/auth/hooks/useAuthMutations'
 import { loginSchema, type LoginFormValues } from '@/features/auth/validation/authSchemas'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
@@ -55,6 +56,8 @@ export default function LoginPage() {
           {errorMessage}
         </Alert>
       )}
+
+      <GoogleSignIn returnTo={state.from} />
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <FormField label="Email" error={errors.email?.message}>

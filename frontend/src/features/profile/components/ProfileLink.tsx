@@ -105,10 +105,11 @@ function HoverCard({ anchor, username, onEnter, onLeave }: HoverCardProps) {
     <div
       ref={cardRef}
       role="tooltip"
+      data-keep-popover
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
       style={{ top: position?.top ?? -9999, left: position?.left ?? -9999, width: CARD_WIDTH }}
-      className="fixed z-[60] animate-fade-in rounded-xl border border-border bg-surface p-4 text-left shadow-2xl"
+      className="fixed z-[60] animate-fade-in rounded-xl border border-border bg-surface p-4 text-left shadow-pop"
     >
       {profile.isPending ? (
         <div className="flex gap-3">

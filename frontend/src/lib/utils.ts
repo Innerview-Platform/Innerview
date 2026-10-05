@@ -33,6 +33,15 @@ export function formatDuration(minutes: number | null | undefined): string {
   return rest ? `${hours} h ${rest} min` : `${hours} h`
 }
 
-export function shortId(id: string): string {
-  return id.slice(0, 8)
+const relativeFormatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
+
+/** "just now", "5 min ago", "yesterday", then a short date. */
+export function formatRelative(epochMs: number, now = Date.now()): string {
+  const seconds = Math.round((epochMs - now) / 1000)
+  const abs = Math.abs(seconds)
+  if (abs < 45) return 'just now'
+  if (abs < 3600) return relativeFormatter.format(Math.round(seconds / 60), 'minute')
+  if (abs < 86_400) return relativeFormatter.format(Math.round(seconds / 3600), 'hour')
+  if (abs < 7 * 86_400) return relativeFormatter.format(Math.round(seconds / 86_400), 'day')
+  return dateFormatter.format(new Date(epochMs))
 }

@@ -53,11 +53,6 @@ export const interviewsApi = {
     await apiClient.patch(`/api/interviews/${id}/cancel`)
   },
 
-  async listInvites(id: number): Promise<Invite[]> {
-    const { data } = await apiClient.get<Invite[]>(`/api/interviews/${id}/invites`)
-    return data
-  },
-
   async invite(id: number, invitees: Invitee[]): Promise<Invite[]> {
     const { data } = await apiClient.post<Invite[]>(`/api/interviews/${id}/invites`, { invitees })
     return data

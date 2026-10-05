@@ -1,5 +1,5 @@
 import { apiClient } from '@/lib/axios'
-import type { AvatarUrls, ProfilePayload, PublicProfile, ResumeInfo, UserProfile, UserRating } from '@/features/profile/types'
+import type { AvatarUrls, ProfilePayload, PublicProfile, ResumeInfo, UserProfile } from '@/features/profile/types'
 
 function fileForm(file: Blob, filename?: string) {
   const form = new FormData()
@@ -30,11 +30,6 @@ export const profileApi = {
   },
 
   /** GET /api/profile/{userId}/rating */
-  async getRating(userId: string): Promise<UserRating> {
-    const { data } = await apiClient.get<UserRating>(`/api/profile/${userId}/rating`)
-    return data
-  },
-
   /** PUT /api/profile/me/avatar — JPEG/PNG/WebP up to 5 MB; the server crops to a square and re-encodes. */
   async uploadAvatar(image: Blob): Promise<AvatarUrls> {
     const { data } = await apiClient.put<AvatarUrls>('/api/profile/me/avatar', fileForm(image, 'avatar.jpg'), UPLOAD)

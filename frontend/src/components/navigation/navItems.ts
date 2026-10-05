@@ -1,4 +1,4 @@
-import { CalendarPlus, DoorOpen, History, House, Star, UserRound, type LucideIcon } from 'lucide-react'
+import { BookOpen, CalendarPlus, DoorOpen, History, House, Star, UserRound, type LucideIcon } from 'lucide-react'
 import { paths } from '@/routes/paths'
 
 export interface NavItem {
@@ -14,6 +14,7 @@ export const primaryNav: NavItem[] = [
   { to: paths.newInterview, label: 'New interview', icon: CalendarPlus },
   { to: paths.join, label: 'Join with a code', icon: DoorOpen, end: true },
   { to: paths.interviews, label: 'Interviews', icon: History, end: true },
+  { to: paths.problems, label: 'Problems', icon: BookOpen },
   { to: paths.feedback, label: 'Feedback', icon: Star },
   { to: paths.settings, label: 'Settings', icon: UserRound },
 ]

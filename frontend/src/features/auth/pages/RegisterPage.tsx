@@ -8,6 +8,7 @@ import { FormField } from '@/components/forms/FormField'
 import { PasswordInput, Select, TextInput } from '@/components/forms/controls'
 import { EMPLOYMENT_STATUS_LABELS, EMPLOYMENT_STATUSES } from '@/constants/enums'
 import { AuthHeading } from '@/components/layout/AuthLayout'
+import { GoogleSignIn } from '@/features/auth/components/GoogleSignIn'
 import { PasswordChecklist } from '@/features/auth/components/PasswordChecklist'
 import { useRegister } from '@/features/auth/hooks/useAuthMutations'
 import { UsernameField } from '@/features/profile/components/UsernameField'
@@ -95,6 +96,8 @@ export default function RegisterPage() {
           )}
         </Alert>
       )}
+
+      <GoogleSignIn label="Sign up with Google" returnTo={(location.state as RedirectState | null)?.from} />
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <FormField label="Full name" error={errors.name?.message}>

@@ -39,7 +39,7 @@ function ScorePicker({ value, onChange, label }: { value: number; onChange: (val
           onClick={() => onChange(score)}
           className={cn(
             'h-8 w-8 rounded-md border text-[13px] font-medium transition-colors',
-            value === score ? 'border-primary bg-primary text-white' : 'border-border text-fg-muted hover:border-fg-muted hover:text-fg',
+            value === score ? 'border-primary bg-primary text-on-primary' : 'border-border text-fg-muted hover:border-fg-muted hover:text-fg',
           )}
         >
           {score}

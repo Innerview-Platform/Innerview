@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { languagesApi, type ProgrammingLanguage } from '@/features/languages/api/languagesApi'
 
-export const languageKeys = {
+const languageKeys = {
   catalog: ['programming-languages'] as const,
   mine: ['profile', 'languages'] as const,
 }

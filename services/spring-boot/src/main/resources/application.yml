@@ -124,6 +124,9 @@ management:
   endpoint:
     health:
       show-details: never
+  health:
+    mail:
+      enabled: false
 
 # Piston code execution (https://github.com/engineer-man/piston)
 piston:

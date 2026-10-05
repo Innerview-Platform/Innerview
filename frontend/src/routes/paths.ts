@@ -1,7 +1,7 @@
 import { formatCode } from '@/features/room/utils/roomCode'
 
 export const paths = {
-  /** Home (dashboard) when signed in. */
+  /** Dashboard when signed in, landing page otherwise. */
   home: '/',
   login: '/login',
   signup: '/signup',
@@ -13,6 +13,8 @@ export const paths = {
   interview: (id: number | string) => `/interviews/${id}`,
   interviewFeedback: (id: number | string) => `/interviews/${id}/feedback`,
   feedback: '/feedback',
+  problems: '/problems',
+  problem: (slug: string) => `/problems/${encodeURIComponent(slug)}`,
   settings: '/settings/profile',
   /** Public profile, by username. */
   publicProfile: (username: string) => `/u/${encodeURIComponent(username)}`,

@@ -9,7 +9,6 @@ export const profileKeys = {
   public: (username: string) => [...profileKeys.all, 'public', username.toLowerCase()] as const,
   /** Everything keyed by a user id: rating, interview history. */
   user: (userId: string) => ['users', userId] as const,
-  rating: (userId: string) => [...profileKeys.user(userId), 'rating'] as const,
 }
 
 export function useMyProfile() {
@@ -27,14 +26,6 @@ export function usePublicProfile(username: string | undefined) {
     enabled: Boolean(username),
     // A missing username is a 404: show "not found" right away instead of retrying.
     retry: (count, error) => count < 2 && (toApiError(error).status ?? 500) >= 500,
-  })
-}
-
-export function useUserRating(userId: string | undefined) {
-  return useQuery({
-    queryKey: profileKeys.rating(userId ?? ''),
-    queryFn: () => profileApi.getRating(userId!),
-    enabled: Boolean(userId),
   })
 }
 

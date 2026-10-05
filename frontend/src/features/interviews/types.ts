@@ -97,6 +97,8 @@ export interface InstantInterviewPayload {
   title?: string
   accessPolicy?: AccessPolicy
   invitees?: Invitee[]
+  /** Library problems to attach (only active ones are kept). Submissions are judged only for these. */
+  problemIds?: string[]
 }
 
 export interface ScheduledInterviewPayload extends InstantInterviewPayload {

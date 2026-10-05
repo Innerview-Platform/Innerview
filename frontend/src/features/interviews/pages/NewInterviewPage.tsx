@@ -9,6 +9,8 @@ import { FormField } from '@/components/forms/FormField'
 import { Select, TextInput } from '@/components/forms/controls'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { INTERVIEW_TYPE_DESCRIPTIONS, INTERVIEW_TYPE_LABELS, INTERVIEW_TYPES, type InterviewType } from '@/constants/enums'
+import { ProblemPicker } from '@/features/problems/components/ProblemPicker'
+import type { Problem } from '@/features/problems/types'
 import { RoomCreatedCard } from '@/features/interviews/components/RoomCreatedCard'
 import { useCreateInstantInterview, useCreateScheduledInterview } from '@/features/interviews/hooks/useInterviews'
 import { createInterviewSchema, type CreateInterviewFormValues } from '@/features/interviews/validation/interviewSchemas'
@@ -35,6 +37,7 @@ interface CreatedState {
   interview: CreatedInterview
   type: InterviewType
   startTime?: string
+  problems: Problem[]
 }
 
 /** Current local time formatted for a `datetime-local` input's `min`. */
@@ -49,6 +52,8 @@ export default function NewInterviewPage() {
   const createInstant = useCreateInstantInterview()
   const createScheduled = useCreateScheduledInterview()
   const [created, setCreated] = useState<CreatedState | null>(null)
+  // Optional problems from the library, sent as `problemIds` (the room can then judge submissions for them).
+  const [problems, setProblems] = useState<Problem[]>([])
 
   const {
     register,
@@ -75,14 +80,15 @@ export default function NewInterviewPage() {
       title: title.trim() || undefined,
       accessPolicy,
       invitees: people.filter((p) => p.email.trim()).map((p) => ({ email: p.email.trim(), role: p.role })),
+      problemIds: problems.length ? problems.map((p) => p.id) : undefined,
     }
     if (mode === 'instant') {
-      createInstant.mutate(payload, { onSuccess: (interview) => setCreated({ interview, type: interviewType }) })
+      createInstant.mutate(payload, { onSuccess: (interview) => setCreated({ interview, type: interviewType, problems }) })
     } else {
       const iso = new Date(startTime).toISOString()
       createScheduled.mutate(
         { ...payload, startTime: iso },
-        { onSuccess: (interview) => setCreated({ interview, type: interviewType, startTime: iso }) },
+        { onSuccess: (interview) => setCreated({ interview, type: interviewType, startTime: iso, problems }) },
       )
     }
   })
@@ -95,6 +101,7 @@ export default function NewInterviewPage() {
           {...created}
           onCreateAnother={() => {
             setCreated(null)
+            setProblems([])
             reset()
             createInstant.reset()
             createScheduled.reset()
@@ -167,6 +174,18 @@ export default function NewInterviewPage() {
             </div>
             {errors.interviewType && <p className="mt-2 text-xs text-danger">{errors.interviewType.message}</p>}
           </fieldset>
+
+          {selectedType !== 'HR' && (
+            <fieldset>
+              <legend className="flex w-full items-baseline justify-between text-sm font-semibold">
+                Problems <span className="text-xs font-normal text-fg-muted">Optional</span>
+              </legend>
+              <p className="mt-1 mb-3 text-[13px] text-fg-muted">
+                Attach problems from the library. In the room, the interviewer loads one into the shared problem and the candidate can submit against its test cases.
+              </p>
+              <ProblemPicker value={problems} onChange={setProblems} />
+            </fieldset>
+          )}
 
           <fieldset>
             <legend className="text-sm font-semibold">Room size</legend>

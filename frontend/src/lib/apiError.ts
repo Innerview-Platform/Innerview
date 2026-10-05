@@ -16,13 +16,16 @@ export class ApiError extends Error {
   readonly status: number | null
   /** Message the backend intends for users, when the body shape indicates one. */
   readonly serverMessage: string | null
+  /** Machine-readable code from ApiException bodies (`{ error, code }`), e.g. "ROOM_FULL". */
+  readonly code: string | null
 
-  constructor(kind: ApiErrorKind, status: number | null, serverMessage: string | null, cause?: unknown) {
+  constructor(kind: ApiErrorKind, status: number | null, serverMessage: string | null, cause?: unknown, code: string | null = null) {
     super(serverMessage ?? `API request failed${status ? ` with status ${status}` : ''}`, { cause })
     this.name = 'ApiError'
     this.kind = kind
     this.status = status
     this.serverMessage = serverMessage
+    this.code = code
   }
 }
 
@@ -42,7 +45,9 @@ export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error
   if (isAxiosError(error)) {
     if (!error.response) return new ApiError('network', null, null, error)
-    return new ApiError('http', error.response.status, extractServerMessage(error.response.data), error)
+    const data = error.response.data as Record<string, unknown> | undefined
+    const code = data && typeof data === 'object' && typeof data.code === 'string' ? data.code : null
+    return new ApiError('http', error.response.status, extractServerMessage(error.response.data), error, code)
   }
   return new ApiError('unknown', null, null, error)
 }

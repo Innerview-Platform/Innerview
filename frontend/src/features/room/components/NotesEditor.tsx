@@ -4,21 +4,17 @@ import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, placeholder as placeholderExtension } from '@codemirror/view'
 import { indentWithTab } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
-import { oneDark } from '@codemirror/theme-one-dark'
 import { yCollab } from 'y-codemirror.next'
 import type { Awareness } from 'y-protocols/awareness'
 import type * as Y from 'yjs'
+import { editorTheme } from '@/lib/codemirrorTheme'
 
-const notesTheme = EditorView.theme(
-  {
-    '&': { backgroundColor: 'var(--color-surface)', fontSize: '13.5px', height: '100%' },
-    '.cm-scroller': { fontFamily: 'var(--font-sans)', lineHeight: '1.6' },
-    '.cm-content': { padding: '14px 16px' },
-    '.cm-placeholder': { color: 'var(--color-fg-muted)' },
-    '&.cm-focused': { outline: 'none' },
-  },
-  { dark: true },
-)
+const notesTheme = EditorView.theme({
+  '&': { height: '100%', fontSize: '14px' },
+  '.cm-scroller': { fontFamily: 'var(--font-sans)', lineHeight: '1.65' },
+  '.cm-content': { padding: '16px 18px' },
+  '.cm-activeLine': { backgroundColor: 'transparent' },
+})
 
 interface NotesEditorProps {
   text: Y.Text
@@ -44,7 +40,7 @@ export function NotesEditor({ text, undoManager, awareness = null, readOnly = fa
           markdown(),
           EditorView.lineWrapping,
           placeholderExtension(placeholder),
-          oneDark,
+          editorTheme,
           notesTheme,
           yCollab(text, awareness, { undoManager }),
           EditorState.readOnly.of(readOnly),

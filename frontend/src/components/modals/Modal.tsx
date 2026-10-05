@@ -52,14 +52,14 @@ export function Modal({ open, onClose, title, description, children, footer, dis
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={dismissible ? onClose : undefined} aria-hidden />
+      <div className="absolute inset-0 animate-[fade-in_0.15s_ease-out_both] bg-overlay" onClick={dismissible ? onClose : undefined} aria-hidden />
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
-        className={cn('relative w-full max-w-md animate-fade-in rounded-xl border border-border bg-surface shadow-2xl', className)}
+        className={cn('relative flex max-h-[calc(100dvh-2rem)] w-full max-w-md animate-fade-in flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-pop', className)}
       >
         <div className="flex items-start justify-between gap-4 px-5 pt-5">
           <div>
@@ -78,7 +78,7 @@ export function Modal({ open, onClose, title, description, children, footer, dis
             </button>
           )}
         </div>
-        {children && <div className="px-5 pt-4">{children}</div>}
+        {children && <div className="min-h-0 overflow-y-auto px-5 pt-4">{children}</div>}
         {footer && <div className="flex justify-end gap-2 px-5 pt-5 pb-5">{footer}</div>}
         {!footer && <div className="pb-5" />}
       </div>

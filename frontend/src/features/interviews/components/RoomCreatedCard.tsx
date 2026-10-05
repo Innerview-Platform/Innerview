@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, CalendarClock, CheckCircle2 } from 'lucide-react'
+import { ArrowRight, BookOpen, CalendarClock, CheckCircle2 } from 'lucide-react'
 import { Button, buttonClasses } from '@/components/common/Button'
 import { Card } from '@/components/common/Card'
 import { CopyButton } from '@/components/common/CopyButton'
@@ -15,10 +15,12 @@ interface RoomCreatedCardProps {
   type: InterviewType
   /** ISO start time for scheduled interviews. */
   startTime?: string
+  /** Library problems attached to the interview. */
+  problems?: { id: string; title: string }[]
   onCreateAnother: () => void
 }
 
-export function RoomCreatedCard({ interview, type, startTime, onCreateAnother }: RoomCreatedCardProps) {
+export function RoomCreatedCard({ interview, type, startTime, problems = [], onCreateAnother }: RoomCreatedCardProps) {
   const scheduled = Boolean(startTime)
 
   return (
@@ -35,6 +37,19 @@ export function RoomCreatedCard({ interview, type, startTime, onCreateAnother }:
           </p>
         </div>
       </div>
+
+      {problems.length > 0 && (
+        <p className="mt-4 flex flex-wrap items-center gap-1.5 text-[13px] text-fg-secondary">
+          <BookOpen className="h-3.5 w-3.5 text-primary" aria-hidden />
+          {problems.length === 1 ? 'Problem:' : `${problems.length} problems:`}
+          {problems.map((p, i) => (
+            <span key={p.id} className="font-medium text-fg">
+              {p.title}
+              {i < problems.length - 1 ? ',' : ''}
+            </span>
+          ))}
+        </p>
+      )}
 
       <div className="mt-6 space-y-4">
         <div>

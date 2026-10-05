@@ -15,7 +15,7 @@ interface JwtPayload {
 }
 
 /** Decodes (without verifying) the payload of a JWT. The backend signs tokens; we only read `sub` and `exp`. */
-export function decodeJwt(token: string): JwtPayload | null {
+function decodeJwt(token: string): JwtPayload | null {
   try {
     const [, payload] = token.split('.')
     if (!payload) return null
@@ -31,7 +31,7 @@ export function getTokenExpiry(token: string): number | null {
   return typeof exp === 'number' ? exp * 1000 : null
 }
 
-export function isSessionValid(session: Pick<StoredSession, 'expiresAt'> | null, now = Date.now()): boolean {
+function isSessionValid(session: Pick<StoredSession, 'expiresAt'> | null, now = Date.now()): boolean {
   return Boolean(session && session.expiresAt > now)
 }
 

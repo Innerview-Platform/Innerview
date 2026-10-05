@@ -19,8 +19,8 @@ const optionalLink = (label: string, site?: string) =>
   }, site ? `Enter a ${site} link` : 'Enter a valid https:// link')
 
 /** Mirrors UsernameRules on the backend (which also rejects reserved names such as "me"). */
-export const USERNAME_MIN = 3
-export const USERNAME_MAX = 30
+const USERNAME_MIN = 3
+const USERNAME_MAX = 30
 export function usernameFormatProblem(raw: string): string | null {
   const username = raw.trim().toLowerCase()
   if (username.length < USERNAME_MIN || username.length > USERNAME_MAX) return `Username must be ${USERNAME_MIN}–${USERNAME_MAX} characters.`

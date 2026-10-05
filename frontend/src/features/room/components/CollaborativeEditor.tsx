@@ -11,10 +11,10 @@ import { javascript } from '@codemirror/lang-javascript'
 import { python } from '@codemirror/lang-python'
 import { rust } from '@codemirror/lang-rust'
 import { csharp } from '@codemirror/legacy-modes/mode/clike'
-import { oneDark } from '@codemirror/theme-one-dark'
 import { yCollab } from 'y-codemirror.next'
 import type * as Y from 'yjs'
 import type { Awareness } from 'y-protocols/awareness'
+import { editorTheme } from '@/lib/codemirrorTheme'
 
 /**
  * Languages the shared editor knows. Keys are Piston language names, so the selected key is sent
@@ -74,15 +74,6 @@ export type EditorLanguage = keyof typeof EDITOR_LANGUAGES
 export const isEditorLanguage = (value: string | undefined): value is EditorLanguage =>
   value !== undefined && Object.hasOwn(EDITOR_LANGUAGES, value)
 
-const surfaceTheme = EditorView.theme(
-  {
-    '&': { backgroundColor: 'var(--color-surface)', fontSize: '13.5px' },
-    '.cm-gutters': { backgroundColor: 'var(--color-surface)', borderRight: '1px solid var(--color-border)' },
-    '.cm-content': { padding: '12px 0' },
-  },
-  { dark: true },
-)
-
 interface CollaborativeEditorProps {
   text: Y.Text
   undoManager: Y.UndoManager
@@ -124,8 +115,7 @@ export function CollaborativeEditor({ text, undoManager, language, label, onRun,
           ),
           basicSetup,
           keymap.of([indentWithTab]),
-          oneDark,
-          surfaceTheme,
+          editorTheme,
           languageCompartment.current.of(EDITOR_LANGUAGES[initialLanguage.current].extension()),
           yCollab(text, awareness, { undoManager }),
           EditorState.readOnly.of(readOnly),
