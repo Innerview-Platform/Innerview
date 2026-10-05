@@ -50,12 +50,16 @@ public class AuthController {
 	@Value("${frontend.url}")
 	private String frontendUrl;
 
+	/** The refresh cookie lives exactly as long as the refresh token it carries. */
+	@Value("${jwt.refresh-token.expiration}")
+	private java.time.Duration refreshTokenLifetime;
+
 	@PostMapping("/login")
 	public ResponseEntity<?> loginUser(@RequestBody @Valid LoginRequest loginRequest) {
 		try {
 			LoginResponse response = userService.login(loginRequest);
 			return ResponseEntity.ok()
-					.header(HttpHeaders.SET_COOKIE, refreshCookie(response.getRefreshToken(), REFRESH_COOKIE_MAX_AGE).toString())
+					.header(HttpHeaders.SET_COOKIE, refreshCookie(response.getRefreshToken(), refreshTokenLifetime.toSeconds()).toString())
 					.header(HttpHeaders.AUTHORIZATION, "Bearer " + response.getAccessToken())
 					.body(response);
 		} catch (IllegalArgumentException ex) {
@@ -104,7 +108,7 @@ public class AuthController {
 			body.put("refresh_token", newRefreshToken.getToken());
 		}
 		return ResponseEntity.ok()
-				.header(HttpHeaders.SET_COOKIE, refreshCookie(newRefreshToken.getToken(), REFRESH_COOKIE_MAX_AGE).toString())
+				.header(HttpHeaders.SET_COOKIE, refreshCookie(newRefreshToken.getToken(), refreshTokenLifetime.toSeconds()).toString())
 				// Clears the Path=/ cookie older Google sign-ins set, so only one refresh_token remains.
 				.header(HttpHeaders.SET_COOKIE, ResponseCookie.from(REFRESH_COOKIE, "").path("/").maxAge(0).build().toString())
 				.header(HttpHeaders.AUTHORIZATION, "Bearer " + newAccessToken)
@@ -112,7 +116,6 @@ public class AuthController {
 	}
 
 	static final String REFRESH_COOKIE = "refresh_token";
-	static final long REFRESH_COOKIE_MAX_AGE = 7L * 24 * 60 * 60;
 
 	/** The refresh token cookie: httpOnly, only sent to /api/auth, same-site only, HTTPS-only when the app is served over HTTPS. */
 	ResponseCookie refreshCookie(String value, long maxAgeSeconds) {

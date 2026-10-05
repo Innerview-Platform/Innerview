@@ -63,6 +63,8 @@ class OAuth2SuccessHandlerTest {
 		request = new MockHttpServletRequest();
 		response = new MockHttpServletResponse();
 		ReflectionTestUtils.setField(successHandler, "frontendUrl", "/api/auth");
+		// Normally injected from jwt.refresh-token.expiration.
+		ReflectionTestUtils.setField(successHandler, "refreshTokenExpiry", java.time.Duration.ofDays(7));
 		// Mock the OAuth2User attributes
 		when(authentication.getPrincipal()).thenReturn(oAuth2User);
 		when(oAuth2User.getAttribute("email")).thenReturn(email);

@@ -8,6 +8,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
@@ -17,11 +18,9 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
-  @Value("${jwt.access-token.expiration}")
-  int accessTokenExpiry;
-
+  /** A Duration, so lifetimes past ~24 days don't overflow (an int of milliseconds did). */
   @Value("${jwt.refresh-token.expiration}")
-  int refreshTokenExpiry;
+  Duration refreshTokenExpiry;
 
   @Value("${frontend.url}")
   private String frontendUrl;
@@ -86,7 +85,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             .httpOnly(true)
             .secure(frontendUrl.startsWith("https://"))
             .path("/api/auth")
-            .maxAge(refreshTokenExpiry / 1000)
+            .maxAge(refreshTokenExpiry)
             .sameSite("Lax")
             .build()
             .toString());

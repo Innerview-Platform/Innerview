@@ -37,9 +37,9 @@ spring:
 jwt:
   secret: dGVzdC1mYWtlLXNlY3JldC1rZXktZm9yLWNpLXRlc3Rpbmctb25seQ==
   access-token:
-    expiration: 900000
+    expiration: 15m
   refresh-token:
-    expiration: 604800000
+    expiration: 7d
 
 frontend:
   url: "http://localhost:3000"

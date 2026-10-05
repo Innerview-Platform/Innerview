@@ -10,6 +10,7 @@ import io.jsonwebtoken.security.Keys;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.time.Duration;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -21,11 +22,12 @@ public class JwtUtil {
 	@Value("${jwt.secret}")
 	private String secret;
 
+	/** e.g. "15m"; a plain number is read as milliseconds (Spring's Duration conversion). */
 	@Value("${jwt.access-token.expiration}")
-	private Long accessTokenExpiration; // 15 minutes in milliseconds
+	private Duration accessTokenExpiration;
 
 	@Value("${jwt.refresh-token.expiration}")
-	private Long refreshTokenExpiration; // 7 days in milliseconds
+	private Duration refreshTokenExpiration;
 
 	private Key getSigningKey() {
 		byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
@@ -50,9 +52,9 @@ public class JwtUtil {
 		return createToken(claims, userId.toString(), refreshTokenExpiration);
 	}
 
-	private String createToken(Map<String, Object> claims, String subject, Long expiration) {
+	private String createToken(Map<String, Object> claims, String subject, Duration expiration) {
 		Date now = new Date();
-		Date expiryDate = new Date(now.getTime() + expiration);
+		Date expiryDate = new Date(now.getTime() + expiration.toMillis());
 
 		return Jwts.builder()
 				.setClaims(claims)

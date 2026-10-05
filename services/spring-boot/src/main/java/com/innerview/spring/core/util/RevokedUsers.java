@@ -18,8 +18,8 @@ public class RevokedUsers {
   private final ConcurrentHashMap<UUID, Instant> revokedUntil = new ConcurrentHashMap<>();
   private final Duration tokenLifetime;
 
-  public RevokedUsers(@Value("${jwt.access-token.expiration}") long accessTokenMillis) {
-    this.tokenLifetime = Duration.ofMillis(accessTokenMillis).plusMinutes(1);
+  public RevokedUsers(@Value("${jwt.access-token.expiration}") Duration accessTokenLifetime) {
+    this.tokenLifetime = accessTokenLifetime.plusMinutes(1);
   }
 
   public void revoke(UUID userId) {

@@ -11,6 +11,7 @@ import com.innerview.spring.service.RefreshTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -23,7 +24,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 	private final JwtUtil jwtUtil;
 
 	@Value("${jwt.refresh-token.expiration}")
-	private Long refreshTokenExpiration; // 7 days in milliseconds
+	private Duration refreshTokenExpiration; // e.g. "7d"
 
 
 	@Transactional
@@ -33,7 +34,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 		String tokenString = jwtUtil.generateRefreshToken(user.getId());
 
 		LocalDateTime expiresAt = LocalDateTime.now()
-				.plusSeconds(refreshTokenExpiration / 1000);
+				.plus(refreshTokenExpiration);
 
 		RefreshToken refreshToken = RefreshToken.builder()
 				.token(tokenString)
