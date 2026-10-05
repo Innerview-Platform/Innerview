@@ -91,9 +91,9 @@ server:
 jwt:
   secret: ${JWT_SECRET}
   access-token:
-    expiration: 1296000 # 15 mins
+    expiration: 900 # 15 mins
   refresh-token:
-    expiration: 604800000 # 7 days
+    expiration: 604800 # 7 days
 
 # Custom Application configurations
 frontend:
