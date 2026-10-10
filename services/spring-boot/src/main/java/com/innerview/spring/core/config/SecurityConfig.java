@@ -1,6 +1,7 @@
 package com.innerview.spring.core.config;
 
 import com.innerview.spring.core.handler.OAuth2SuccessHandler;
+import jakarta.servlet.DispatcherType;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -56,7 +57,12 @@ public class SecurityConfig {
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers(
+                // The original request was already authorized. Async/error dispatches (e.g. when an
+                // SSE stream completes or times out) carry no JWT, and denying them here only throws
+                // AccessDenied on an already-committed response.
+                auth.dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR)
+                    .permitAll()
+                    .requestMatchers(
                         "/api/auth/login",
                         "/api/auth/signup",
                         "/api/auth/refresh",

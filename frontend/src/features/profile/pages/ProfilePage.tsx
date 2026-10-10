@@ -68,7 +68,7 @@ export default function ProfilePage() {
     <>
       <PageHeader
         title="Profile"
-        description="How other engineers see you on InnerView."
+        description="How other engineers see you on InnerViewHub."
         actions={
           profile.username && (
             <Link to={paths.publicProfile(profile.username)} className={buttonClasses({ variant: 'secondary', size: 'sm' })}>

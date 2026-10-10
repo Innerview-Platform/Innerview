@@ -4,10 +4,11 @@ import { useAppSelector } from '@/app/hooks'
 import { PageLoader } from '@/components/feedback/states'
 import { OAUTH_RETURN_KEY } from '@/features/auth/components/GoogleSignIn'
 import { selectIsAuthenticated } from '@/features/auth/slices/authSlice'
+import { mayHaveSession } from '@/features/auth/utils/session'
 import { refreshSession } from '@/lib/axios'
 
 /** The backend sends Google sign-ins back to `/?signin=google` with only the refresh cookie set. */
-function isGoogleReturn() {
+export function isGoogleReturn() {
   return new URLSearchParams(window.location.search).get('signin') === 'google'
 }
 
@@ -30,10 +31,14 @@ function finishGoogleReturn(signedIn: boolean) {
 /**
  * Restores the session before routing: without a stored access token (first visit after it expired,
  * or right after Google sign-in, which only sets the refresh cookie) try the refresh cookie once.
+ * A browser that has never had a session renders straight away (no refresh call to wait for).
  */
 export function AuthBootstrap({ children }: { children: ReactNode }) {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const [ready, setReady] = useState(isAuthenticated && !isGoogleReturn())
+  // The build-time prerender (no window) renders the signed-out pages.
+  const [ready, setReady] = useState(
+    () => typeof window === 'undefined' || (!isGoogleReturn() && (isAuthenticated || !mayHaveSession())),
+  )
 
   useEffect(() => {
     if (ready) return

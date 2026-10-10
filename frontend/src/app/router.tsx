@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { createBrowserRouter, Navigate, Outlet, useParams } from 'react-router-dom'
+import { Navigate, Outlet, useParams, type RouteObject } from 'react-router-dom'
 import { useAppSelector } from '@/app/hooks'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AuthLayout } from '@/components/layout/AuthLayout'
@@ -29,11 +29,22 @@ const ProfilePage = lazy(() => import('@/features/profile/pages/ProfilePage'))
 const PublicProfilePage = lazy(() => import('@/features/profile/pages/PublicProfilePage'))
 const JoinRoomPage = lazy(() => import('@/features/room/pages/JoinRoomPage'))
 const RoomPage = lazy(() => import('@/features/room/pages/RoomPage'))
+const SystemDesignMockInterviewPage = lazy(() => import('@/features/marketing/pages/SystemDesignMockInterviewPage'))
+const MockCodingInterviewPage = lazy(() => import('@/features/marketing/pages/MockCodingInterviewPage'))
+const MockInterviewWithAFriendPage = lazy(() => import('@/features/marketing/pages/MockInterviewWithAFriendPage'))
+const FeedbackRubricPage = lazy(() => import('@/features/marketing/pages/FeedbackRubricPage'))
 
-/** `/:code` is the room; anything that isn't shaped like a code is a 404 (typos of app pages). */
+/**
+ * `/:code` is the room; anything that isn't shaped like a code is a 404 (typos of app pages), checked
+ * before sign-in so signed-out visitors see "Page not found", matching the 404 status nginx sends.
+ */
+function RoomCodeOnly() {
+  const { code = '' } = useParams()
+  return looksLikeRoomCode(code) ? <Outlet /> : <NotFoundPage />
+}
+
 function RoomRoute() {
   const { code = '' } = useParams()
-  if (!looksLikeRoomCode(code)) return <NotFoundPage />
   return (
     <Suspense fallback={<PageLoader label="Preparing the room…" />}>
       <RoomPage key={code.toLowerCase()} />
@@ -62,13 +73,23 @@ function HomeRoute() {
   )
 }
 
+/** Public, prerendered content pages (see src/seo/site.ts); the same for signed-in and signed-out visitors. */
+function PublicPage({ page: Page }: { page: React.ComponentType }) {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <Page />
+    </Suspense>
+  )
+}
+
 /** Old links (emails, bookmarks) keep working. */
 function LegacyRoomRedirect() {
   const { roomId = '' } = useParams()
   return <Navigate to={paths.room(roomId)} replace />
 }
 
-export const router = createBrowserRouter([
+/** Shared by the browser router (main.tsx) and the build-time prerender (entry-prerender.tsx). */
+export const routes: RouteObject[] = [
   {
     element: <RootShell />,
     errorElement: <RouteErrorPage />,
@@ -88,6 +109,12 @@ export const router = createBrowserRouter([
           },
         ],
       },
+
+      // Public content pages.
+      { path: paths.systemDesignMockInterview, element: <PublicPage page={SystemDesignMockInterviewPage} /> },
+      { path: paths.mockCodingInterview, element: <PublicPage page={MockCodingInterviewPage} /> },
+      { path: paths.mockInterviewWithAFriend, element: <PublicPage page={MockInterviewWithAFriendPage} /> },
+      { path: paths.feedbackRubric, element: <PublicPage page={FeedbackRubricPage} /> },
 
       // Reachable signed in or out: the emailed link can be opened from any state.
       { element: <AuthLayout />, children: [{ path: paths.resetPassword, element: <ResetPasswordPage /> }] },
@@ -110,9 +137,14 @@ export const router = createBrowserRouter([
               { path: paths.join, element: <JoinRoomPage /> },
             ],
           },
-          // Full-screen interview room (pre-join, lobby, call and "ended" states), outside the app chrome.
-          { path: '/:code', element: <RoomRoute /> },
         ],
+      },
+
+      // Full-screen interview room (pre-join, lobby, call and "ended" states), outside the app chrome.
+      {
+        path: '/:code',
+        element: <RoomCodeOnly />,
+        children: [{ element: <ProtectedRoute />, children: [{ index: true, element: <RoomRoute /> }] }],
       },
 
       // Legacy URLs.
@@ -126,4 +158,4 @@ export const router = createBrowserRouter([
       { path: '*', element: <NotFoundPage /> },
     ],
   },
-])
+]

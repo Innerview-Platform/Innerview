@@ -19,6 +19,11 @@ export const paths = {
   /** Public profile, by username. */
   publicProfile: (username: string) => `/u/${encodeURIComponent(username)}`,
   join: '/join',
+  /** Public content pages (prerendered, indexable; see src/seo/site.ts). */
+  systemDesignMockInterview: '/system-design-mock-interview',
+  mockCodingInterview: '/mock-coding-interview',
+  mockInterviewWithAFriend: '/mock-interview-with-a-friend',
+  feedbackRubric: '/mock-interview-feedback-rubric',
   /** Must match the links built by the backend: `${frontend.url}/abc-defg-hij` */
   room: (code: string) => `/${formatCode(code)}`,
 } as const

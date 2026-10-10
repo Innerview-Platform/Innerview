@@ -48,3 +48,6 @@ application.properties
 .vscode/
 .idea/*.xml
 node_modules/
+
+# Frontend build-time prerender bundle (scripts/prerender.mjs deletes it after use)
+frontend/dist-ssr/

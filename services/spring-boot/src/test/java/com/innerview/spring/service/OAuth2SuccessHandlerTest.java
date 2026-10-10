@@ -23,6 +23,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -142,8 +143,29 @@ class OAuth2SuccessHandlerTest {
 		assertEquals("Google", savedUser.getAuthProvider());
 		assertEquals(email, savedUser.getEmail());
 		assertEquals(providerId, savedUser.getProviderId());
+		// Columns the database requires (save() is mocked here, so assert them explicitly).
+		assertEquals(name, savedUser.getName());
+		assertEquals(0, savedUser.getForgotPasswordCount());
+		assertNull(savedUser.getPasswordHash()); // Google accounts have no password
 
 		assertCookiesAndRedirect();
+	}
+
+	@Test
+	void onAuthenticationSuccess_NewUserWithoutName_ShouldFallBackToEmailLocalPart() throws IOException {
+		when(oAuth2User.getAttribute("name")).thenReturn(null);
+		when(userRepository.findByProviderId(providerId)).thenReturn(Optional.empty());
+		when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
+		User saved = User.builder().email(email).providerId(providerId).name("test").build();
+		when(userRepository.save(any(User.class))).thenReturn(saved);
+		setupTokenServiceMocks(saved);
+
+		successHandler.onAuthenticationSuccess(request, response, authentication);
+
+		ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+		verify(userRepository).save(userCaptor.capture());
+		assertEquals("test", userCaptor.getValue().getName());
+		assertEquals(0, userCaptor.getValue().getForgotPasswordCount());
 	}
 
 	// Helpers

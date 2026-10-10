@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   readonly VITE_CANVAS_URL?: string
   /** Hocuspocus (shared editor/notes) base URL (default: `/collab` on the SPA origin). */
   readonly VITE_COLLAB_URL?: string
+  /** Build only: public origin for canonical URLs, Open Graph, robots.txt and sitemap.xml (vite-plugin-seo.ts). */
+  readonly VITE_SITE_URL?: string
   /** Dev-server only: backend the Vite proxy forwards /api and /ws-signal to. */
   readonly VITE_DEV_PROXY_TARGET?: string
 }

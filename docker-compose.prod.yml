@@ -6,7 +6,7 @@
 # `docker compose up -d --build`). See docs/DEPLOYMENT.md for the full guide.
 #
 # Caddy is the only public web entry point. It terminates HTTPS with a Let's Encrypt certificate
-# for PUBLIC_HOST (a bare IP works) and proxies to the frontend's nginx, which routes /api,
+# for PUBLIC_HOST (the domain), redirects www and the bare IP to it, and proxies to the frontend's nginx, which routes /api,
 # /ws-signal, /canvas and /collab to the backend and the collaboration servers.
 # Browsers only allow camera/microphone access (and crypto.randomUUID) on HTTPS pages, so the
 # interview room does not work over plain http://<ip>.
@@ -26,6 +26,7 @@ services:
       - "7443:7443"
     environment:
       PUBLIC_HOST: *public-host
+      PUBLIC_IP: ${PUBLIC_IP:?Set PUBLIC_IP in .env (the VPS public IPv4 address)}
     volumes:
       - ./infrastructure/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
@@ -43,6 +44,8 @@ services:
         # The SPA calls /api, /ws-signal, /canvas and /collab on its own origin (https://PUBLIC_HOST),
         # so only LiveKit needs an absolute URL. Caddy serves it with TLS on port 7443.
         VITE_LIVEKIT_URL: wss://${PUBLIC_HOST}:7443
+        # Canonical URLs, Open Graph tags, robots.txt and sitemap.xml are written for this origin.
+        VITE_SITE_URL: https://${PUBLIC_HOST}
 
   backend:
     environment:

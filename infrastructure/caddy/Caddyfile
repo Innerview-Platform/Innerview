@@ -1,17 +1,35 @@
 # Public HTTPS entry point for production (docker-compose.prod.yml).
 #
 #   https://{$PUBLIC_HOST}        → frontend nginx (SPA, /api, /ws-signal, /canvas, /collab, OAuth)
+#   https://www.{$PUBLIC_HOST}    → 301 to https://{$PUBLIC_HOST} (one origin for cookies, CORS, OAuth)
 #   https://{$PUBLIC_HOST}:7443   → LiveKit signaling (the browser connects with wss://)
+#   https://{$PUBLIC_IP}          → 301 to https://{$PUBLIC_HOST} (old IP links and bookmarks)
 #
-# PUBLIC_HOST may be a bare public IP (e.g. 187.124.30.226) or a domain. Let's Encrypt only issues
-# IP-address certificates under its 6-day "shortlived" profile; Caddy renews them automatically.
-# Ports 80 and 443 must be reachable from the internet for the ACME challenges.
+# PUBLIC_HOST is the domain (innerviewhub.com); its DNS A record must point to PUBLIC_IP.
+# Caddy gets standard Let's Encrypt certificates for the domain and renews them automatically.
+# Let's Encrypt only issues IP-address certificates under its 6-day "shortlived" profile; Caddy
+# renews those automatically too. Ports 80 and 443 must be reachable for the ACME challenges.
 {
 	# Browsers send no SNI when they connect to a bare IP, so tell Caddy which certificate to serve.
-	default_sni {$PUBLIC_HOST}
+	default_sni {$PUBLIC_IP}
 }
 
-(letsencrypt) {
+# Security headers for HTML, static files and whiteboard uploads, which had none. `?` only sets a
+# header the upstream didn't send, so Spring Security's own (stricter) API headers win.
+# The CSP is deliberately minimal: framing and <base> only. A full script/style policy needs testing
+# against Excalidraw (embeds, libraries) and LiveKit first.
+(security-headers) {
+	header {
+		?Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		?X-Content-Type-Options "nosniff"
+		?X-Frame-Options "SAMEORIGIN"
+		?Referrer-Policy "strict-origin-when-cross-origin"
+		?Permissions-Policy "camera=(self), microphone=(self), display-capture=(self), geolocation=(), payment=(), usb=()"
+		?Content-Security-Policy "frame-ancestors 'self'; base-uri 'self'"
+	}
+}
+
+(letsencrypt-ip) {
 	tls {
 		issuer acme {
 			profile shortlived
@@ -20,11 +38,26 @@
 }
 
 {$PUBLIC_HOST} {
-	import letsencrypt
+	import security-headers
 	reverse_proxy frontend:80
 }
 
+www.{$PUBLIC_HOST} {
+	import security-headers
+	redir https://{$PUBLIC_HOST}{uri} permanent
+}
+
 {$PUBLIC_HOST}:7443 {
-	import letsencrypt
+	reverse_proxy livekit:7880
+}
+
+{$PUBLIC_IP} {
+	import letsencrypt-ip
+	redir https://{$PUBLIC_HOST}{uri} permanent
+}
+
+# Kept so browser tabs still running an older build (wss://PUBLIC_IP:7443) can finish their calls.
+{$PUBLIC_IP}:7443 {
+	import letsencrypt-ip
 	reverse_proxy livekit:7880
 }
