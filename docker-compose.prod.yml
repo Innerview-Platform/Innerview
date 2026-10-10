@@ -44,6 +44,8 @@ services:
         # The SPA calls /api, /ws-signal, /canvas and /collab on its own origin (https://PUBLIC_HOST),
         # so only LiveKit needs an absolute URL. Caddy serves it with TLS on port 7443.
         VITE_LIVEKIT_URL: wss://${PUBLIC_HOST}:7443
+        # Canonical URLs, Open Graph tags, robots.txt and sitemap.xml are written for this origin.
+        VITE_SITE_URL: https://${PUBLIC_HOST}
 
   backend:
     environment:

@@ -21,8 +21,11 @@ COPY . .
 # VITE_API_BASE_URL is intentionally left empty so the SPA calls /api/...
 # on its own origin (nginx reverse-proxies to the backend).
 ARG VITE_LIVEKIT_URL="ws://localhost:7880"
+# Origin used for canonical URLs, social previews, robots.txt and sitemap.xml (see vite-plugin-seo.ts).
+ARG VITE_SITE_URL="https://innerviewhub.com"
 ENV VITE_API_BASE_URL=""
 ENV VITE_LIVEKIT_URL=$VITE_LIVEKIT_URL
+ENV VITE_SITE_URL=$VITE_SITE_URL
 RUN pnpm run build
 
 # ──────────────────────────────────────────────

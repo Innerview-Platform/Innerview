@@ -66,7 +66,7 @@ const GENERIC_MESSAGES: Record<number, string> = {
 export function getErrorMessage(error: unknown, fallback = 'Something went wrong. Please try again.'): string {
   const apiError = toApiError(error)
 
-  if (apiError.kind === 'network') return "Can't reach the InnerView server. Check your connection and try again."
+  if (apiError.kind === 'network') return "Can't reach the InnerViewHub server. Check your connection and try again."
   if (apiError.status === null) return fallback
   if (apiError.status >= 500) return 'Something went wrong on our side. Please try again in a moment.'
   if (apiError.status === 401 && apiError.serverMessage?.startsWith('Authentication token')) return GENERIC_MESSAGES[401]

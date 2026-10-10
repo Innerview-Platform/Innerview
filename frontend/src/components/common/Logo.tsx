@@ -11,7 +11,7 @@ interface LogoMarkProps {
 }
 
 /**
- * The InnerView mark: interviewer and candidate meeting across one table, with code passing
+ * The InnerViewHub mark: interviewer and candidate meeting across one table, with code passing
  * between them. Blue (left) to violet (right), as in the brand logo.
  */
 export function LogoMark({ size = 28, bubble, animated = false, className }: LogoMarkProps) {
@@ -69,11 +69,11 @@ export function LogoMark({ size = 28, bubble, animated = false, className }: Log
   )
 }
 
-/** "Inner" in the text color, "View" in the brand's blue-to-violet. */
+/** "Inner" and "Hub" in the text color, "View" in the brand's blue-to-violet. */
 export function Wordmark({ className }: { className?: string }) {
   return (
     <span className={cn('text-[17px] font-semibold tracking-tight text-fg', className)}>
-      Inner<span className="text-brand-gradient">View</span>
+      Inner<span className="text-brand-gradient">View</span>Hub
     </span>
   )
 }

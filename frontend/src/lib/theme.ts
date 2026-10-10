@@ -35,9 +35,12 @@ function apply() {
   listeners.forEach((listener) => listener())
 }
 
-systemQuery().addEventListener('change', () => {
-  if (preference === 'system') apply()
-})
+// Not in the build-time prerender (no window there).
+if (typeof window !== 'undefined') {
+  systemQuery().addEventListener('change', () => {
+    if (preference === 'system') apply()
+  })
+}
 
 function setThemePreference(next: ThemePreference) {
   preference = next
@@ -55,9 +58,13 @@ const subscribe = (listener: () => void) => {
   return () => void listeners.delete(listener)
 }
 
-/** The saved preference and the theme actually shown (for third-party widgets that need it as a prop). */
+/**
+ * The saved preference and the theme actually shown (for third-party widgets that need it as a prop).
+ * Prerendered HTML is built with the defaults (system → dark); hydration starts from those and then
+ * switches to the visitor's real theme, so the markup matches.
+ */
 export function useTheme() {
-  const current = useSyncExternalStore(subscribe, () => preference)
-  const theme = useSyncExternalStore(subscribe, () => resolve(preference))
+  const current = useSyncExternalStore(subscribe, () => preference, () => 'system' as ThemePreference)
+  const theme = useSyncExternalStore(subscribe, () => resolve(preference), () => 'dark' as Theme)
   return { preference: current, theme, setPreference: setThemePreference }
 }

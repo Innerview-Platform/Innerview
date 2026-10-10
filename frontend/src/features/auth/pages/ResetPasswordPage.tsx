@@ -67,7 +67,7 @@ export default function ResetPasswordPage() {
       {resetPassword.error && (
         <Alert tone="danger" className="mb-5" title={blockedByAuth ? "The server didn't accept this request" : undefined}>
           {blockedByAuth
-            ? 'The InnerView server currently only accepts password resets from a signed-in session. Please contact support.'
+            ? 'The InnerViewHub server currently only accepts password resets from a signed-in session. Please contact support.'
             : getErrorMessage(resetPassword.error)}
           {!blockedByAuth && isApiErrorStatus(resetPassword.error, 400) && (
             <>

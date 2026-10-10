@@ -3,9 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="InnerView — realistic mock technical interviews with real engineers: video, a shared editor and whiteboard, and structured feedback." />
     <meta name="theme-color" content="#080a13" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <!-- Apply the saved (or system) theme before first paint; keep in sync with src/lib/theme.ts. -->
     <script>
       ;(function () {
@@ -16,15 +17,27 @@
           document.documentElement.dataset.theme = theme
           document.querySelector('meta[name="theme-color"]').content = theme === 'light' ? '#f7f7fb' : '#080a13'
         } catch (e) {}
+        // A session to restore (keys from src/features/auth/utils/session.ts) or a Google sign-in return:
+        // main.tsx re-renders from scratch, so hide the prerendered signed-out page until it does.
+        try {
+          if (
+            localStorage.getItem('innerview.hasSession') !== null ||
+            localStorage.getItem('innerview.session') !== null ||
+            /[?&]signin=google/.test(location.search)
+          )
+            document.documentElement.dataset.restoring = ''
+        } catch (e) {}
       })()
     </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap"
-    />
+    <style>
+      html[data-restoring] #root {
+        visibility: hidden;
+      }
+    </style>
+    <!-- seo:start -->
+    <!-- Replaced per page at build time by vite-plugin-seo.ts (titles/descriptions live in src/seo/site.ts). -->
     <title>InnerView</title>
+    <!-- seo:end -->
   </head>
   <body>
     <div id="root"></div>
