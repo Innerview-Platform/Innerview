@@ -14,6 +14,21 @@
 	default_sni {$PUBLIC_IP}
 }
 
+# Security headers for HTML, static files and whiteboard uploads, which had none. `?` only sets a
+# header the upstream didn't send, so Spring Security's own (stricter) API headers win.
+# The CSP is deliberately minimal: framing and <base> only. A full script/style policy needs testing
+# against Excalidraw (embeds, libraries) and LiveKit first.
+(security-headers) {
+	header {
+		?Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		?X-Content-Type-Options "nosniff"
+		?X-Frame-Options "SAMEORIGIN"
+		?Referrer-Policy "strict-origin-when-cross-origin"
+		?Permissions-Policy "camera=(self), microphone=(self), display-capture=(self), geolocation=(), payment=(), usb=()"
+		?Content-Security-Policy "frame-ancestors 'self'; base-uri 'self'"
+	}
+}
+
 (letsencrypt-ip) {
 	tls {
 		issuer acme {
@@ -23,10 +38,12 @@
 }
 
 {$PUBLIC_HOST} {
+	import security-headers
 	reverse_proxy frontend:80
 }
 
 www.{$PUBLIC_HOST} {
+	import security-headers
 	redir https://{$PUBLIC_HOST}{uri} permanent
 }
 
