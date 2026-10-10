@@ -169,6 +169,14 @@ curl https://innerviewhub.com/actuator/health         # {"status":"UP"}
 curl -I https://www.innerviewhub.com                  # 301 → https://innerviewhub.com/
 ```
 
+After a frontend or nginx change, run the SEO and delivery checks against the live site (status codes,
+redirects, robots.txt, sitemap, noindex on private pages, compression, security headers). See
+[tests/seo/README.md](../tests/seo/README.md):
+
+```bash
+docker run --rm -v "$PWD":/repo -w /repo node:22-alpine node --experimental-strip-types tests/seo/production.check.mjs
+```
+
 Open **https://innerviewhub.com** in your browser. It should load with a padlock and no certificate
 warning.
 
