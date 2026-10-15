@@ -1,0 +1,26 @@
+<!-- Source of frontend/public/og-image.png (1200×630). To regenerate: copy geist-latin.woff2, instrument-serif-latin.woff2 and
+     instrument-serif-italic-latin.woff2 from frontend/src/assets/fonts next to this file, then:
+     chromium --headless=new --hide-scrollbars --window-size=1200,630 --screenshot=og-image.png og-image.html -->
+<!doctype html><html><head><meta charset="utf-8"><style>
+@font-face{font-family:Geist;src:url(geist-latin.woff2) format('woff2');font-weight:100 900}
+@font-face{font-family:'Instrument Serif';src:url(instrument-serif-latin.woff2) format('woff2')}
+@font-face{font-family:'Instrument Serif';font-style:italic;src:url(instrument-serif-italic-latin.woff2) format('woff2')}
+html,body{margin:0;width:1200px;height:630px;overflow:hidden}
+body{background:#080a13;color:#f8fafc;font-family:Geist,sans-serif;position:relative}
+.grid{position:absolute;inset:0;background-image:radial-gradient(#1f2333 1.2px,transparent 1.2px);background-size:26px 26px;-webkit-mask-image:linear-gradient(to bottom,#000 10%,transparent 85%)}
+.glow{position:absolute;inset:0;background:radial-gradient(40% 55% at 82% 40%,rgba(106,166,255,.16),transparent 70%),radial-gradient(40% 55% at 95% 70%,rgba(193,155,255,.16),transparent 70%)}
+.wrap{position:absolute;inset:0;padding:72px 80px;display:flex;flex-direction:column;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:18px;font-size:40px;font-weight:600;letter-spacing:-.02em}
+.mark{width:64px;height:64px}
+.g{background:linear-gradient(100deg,#6aa6ff,#c19bff);-webkit-background-clip:text;background-clip:text;color:transparent}
+h1{font-family:'Instrument Serif',serif;font-weight:400;font-size:84px;line-height:1.02;letter-spacing:-.02em;margin:0;max-width:960px}
+h1 em{padding-right:6px;margin-right:-6px}
+.sub{font-size:28px;color:#a7abc0;margin-top:22px;max-width:900px;line-height:1.35}
+.foot{display:flex;justify-content:space-between;align-items:center;font-size:24px;color:#868aa3}
+.pill{border:1px solid #2a2f45;border-radius:999px;padding:8px 18px;color:#a7abc0}
+</style></head><body><div class="grid"></div><div class="glow"></div><div class="wrap">
+<div class="brand"><div class="mark"><svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 64 64" fill="none"><defs><linearGradient id="b" x1=".15" y1="0" x2=".55" y2="1"><stop offset="0" stop-color="#4fc4ff"/><stop offset="1" stop-color="#3a56f0"/></linearGradient><linearGradient id="v" x1=".85" y1="0" x2=".4" y2="1"><stop offset="0" stop-color="#e2a8ff"/><stop offset="1" stop-color="#7650f2"/></linearGradient></defs><circle cx="15.5" cy="12.5" r="6.5" fill="url(#b)"/><circle cx="48.5" cy="12.5" r="6.5" fill="url(#v)"/><path d="M49.5 22.5C56.5 24 59.5 32.5 59.5 40.5C59.5 48 55 53 47.5 53H25C23.3 53 22 51.8 22 50.2C22 48.6 23.3 47.5 25 47.5H43.5C45.6 47.5 46.6 46 46.2 44L43.6 31.5C42.8 26.8 45.5 21.6 49.5 22.5Z" fill="url(#v)"/><path d="M14.5 22.5C7.5 24 4.5 32.5 4.5 40.5C4.5 46.5 8.5 50.5 14 50.5C16.8 50.5 18.6 49 19.6 46H43C44.7 46 46 44.7 46 43C46 41.3 44.7 40 43 40H28C25.3 40 23.7 38.3 22.9 35.5L20.8 28.5C19.6 24.6 17.6 21.8 14.5 22.5Z" fill="url(#b)"/></svg></div><span>Inner<span class="g">View</span>Hub</span></div>
+<div><h1>Rehearse the interview <em class="g">with real people</em>.</h1>
+<div class="sub">Live mock technical interviews: video, a shared code editor, a whiteboard and structured feedback.</div></div>
+<div class="foot"><span>innerviewhub.com</span><span class="pill">Coding · System design · Technical · Behavioral</span></div>
+</div></body></html>

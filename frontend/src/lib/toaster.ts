@@ -18,5 +18,6 @@ export function useToasterPlacement() {
       return () => void listeners.delete(listener)
     },
     () => placement,
+    () => 'app' as ToasterPlacement,
   )
 }

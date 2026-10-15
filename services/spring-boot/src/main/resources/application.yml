@@ -27,8 +27,9 @@ spring:
               - openid
               - profile
               - email
-              - https://www.googleapis.com/auth/calendar.events # Needed for your service
-              - https://www.googleapis.com/auth/calendar        # Needed for your service
+              # Sign-in only. Calendar scopes are "sensitive" and would require Google's app verification
+              # before anyone outside the test-user list could sign in. Without them GoogleApiServiceImpl
+              # skips creating Google Calendar events; the .ics "Add to calendar" download still works.
             redirect-uri: "{baseUrl}/login/oauth2/code/google"
             authorization-grant-type: authorization_code
 

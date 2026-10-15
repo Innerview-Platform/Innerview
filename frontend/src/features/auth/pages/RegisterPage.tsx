@@ -19,10 +19,11 @@ import { useAppDispatch } from '@/app/hooks'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { getErrorMessage, toApiError } from '@/lib/apiError'
 import { paths } from '@/routes/paths'
+import { PUBLIC_PAGES } from '@/seo/site'
 import type { RedirectState } from '@/routes/guards'
 
 export default function RegisterPage() {
-  useDocumentTitle('Create account')
+  useDocumentTitle(PUBLIC_PAGES.signup.title)
   const navigate = useNavigate()
   const location = useLocation()
   const dispatch = useAppDispatch()

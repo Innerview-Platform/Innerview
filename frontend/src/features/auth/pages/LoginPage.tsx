@@ -12,6 +12,7 @@ import { loginSchema, type LoginFormValues } from '@/features/auth/validation/au
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { getErrorMessage, toApiError } from '@/lib/apiError'
 import { paths } from '@/routes/paths'
+import { PUBLIC_PAGES } from '@/seo/site'
 
 interface LoginLocationState {
   email?: string
@@ -19,7 +20,7 @@ interface LoginLocationState {
 }
 
 export default function LoginPage() {
-  useDocumentTitle('Sign in')
+  useDocumentTitle(PUBLIC_PAGES.login.title)
   const location = useLocation()
   const state = (location.state as LoginLocationState | null) ?? {}
   const login = useLogin()

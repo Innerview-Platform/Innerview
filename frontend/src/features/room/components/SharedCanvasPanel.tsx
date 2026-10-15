@@ -159,7 +159,7 @@ export function SharedCanvasPanel({ roomId, fetchTicket, header, className, read
             isCollaborating
             viewModeEnabled={readOnly}
             theme={theme}
-            name="InnerView whiteboard"
+            name="InnerViewHub whiteboard"
             autoFocus={false}
           />
         </div>

@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && vite build --ssr src/entry-prerender.tsx --outDir dist-ssr && node scripts/prerender.mjs",
     "typecheck": "tsc --noEmit",
+    "check:seo": "node --experimental-strip-types ../tests/seo/routes.check.mjs && node --experimental-strip-types ../tests/seo/content.check.mjs && node --experimental-strip-types ../tests/seo/dist.check.mjs dist",
     "preview": "vite preview",
     "format": "oxfmt"
   },

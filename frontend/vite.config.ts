@@ -7,7 +7,7 @@ import path from 'node:path'
 // does not list it in `Access-Control-Expose-Headers`, so browsers can only read it when the
 // SPA and the API share an origin. In development the Vite server proxies `/api` and the
 // STOMP endpoint to the backend to provide that same origin.
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, isSsrBuild }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const proxyTarget = env.VITE_DEV_PROXY_TARGET || 'http://localhost:8080'
   const canvasTarget = env.VITE_DEV_CANVAS_TARGET || 'http://localhost:5858'
@@ -51,6 +51,10 @@ export default defineConfig(({ mode }) => {
     build: {
       // The largest chunks (CodeMirror, LiveKit) are lazy-loaded inside the interview room only.
       chunkSizeWarningLimit: 900,
+      // `pnpm run build` also builds src/entry-prerender.tsx with --ssr; scripts/prerender.mjs then reads
+      // the client manifest (to preload each prerendered page's chunk) and deletes it.
+      manifest: !isSsrBuild,
+      copyPublicDir: !isSsrBuild,
     },
   }
 })

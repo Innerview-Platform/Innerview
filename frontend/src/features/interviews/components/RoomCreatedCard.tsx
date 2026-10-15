@@ -70,7 +70,7 @@ export function RoomCreatedCard({ interview, type, startTime, problems = [], onC
 
       {scheduled && (
         <Alert tone="info" className="mt-5">
-          Save the code or link now — InnerView can&apos;t list scheduled interviews yet. The room opens at the start time.
+          Save the code or link now — InnerViewHub can&apos;t list scheduled interviews yet. The room opens at the start time.
         </Alert>
       )}
 

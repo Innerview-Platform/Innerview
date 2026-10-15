@@ -68,7 +68,8 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             User.builder()
                 .authProvider("Google")
                 .providerId(providerId)
-                .name(name)
+                // Google can omit the display name; the column is required.
+                .name(name != null && !name.isBlank() ? name : email.substring(0, email.indexOf('@')))
                 .email(email)
                 .passwordHash(null)
                 .build();

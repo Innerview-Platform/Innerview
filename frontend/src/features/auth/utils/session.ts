@@ -1,6 +1,11 @@
 import type { AuthUser } from '@/features/auth/types'
 
 const STORAGE_KEY = 'innerview.session'
+/**
+ * Set whenever this browser has held a session; cleared on sign-out and when a session expires. Lets
+ * first-time visitors skip the refresh call (always a 401 for them) before the first render.
+ */
+const HINT_KEY = 'innerview.hasSession'
 
 export interface StoredSession {
   accessToken: string
@@ -42,6 +47,8 @@ export function loadSession(): StoredSession | null {
     const session = JSON.parse(raw) as StoredSession
     if (!session.accessToken || !session.user?.id || !isSessionValid(session)) {
       localStorage.removeItem(STORAGE_KEY)
+      // The access token expired, but the refresh cookie may still be good.
+      localStorage.setItem(HINT_KEY, '1')
       return null
     }
     return session
@@ -53,6 +60,7 @@ export function loadSession(): StoredSession | null {
 export function saveSession(session: StoredSession) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(session))
+    localStorage.setItem(HINT_KEY, '1')
   } catch {
     // Storage can be unavailable (private mode, quota); the session still works for this tab.
   }
@@ -61,8 +69,18 @@ export function saveSession(session: StoredSession) {
 export function clearSession() {
   try {
     localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(HINT_KEY)
   } catch {
     // ignore
+  }
+}
+
+/** False only when this browser has never had a session (so there can't be a refresh cookie worth trying). */
+export function mayHaveSession(): boolean {
+  try {
+    return localStorage.getItem(HINT_KEY) !== null || localStorage.getItem(STORAGE_KEY) !== null
+  } catch {
+    return true
   }
 }
 

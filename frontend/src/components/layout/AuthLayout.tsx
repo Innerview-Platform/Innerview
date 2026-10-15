@@ -43,7 +43,7 @@ export function AuthLayout() {
             ))}
           </ul>
         </div>
-        <p className="relative text-xs text-fg-muted">© {new Date().getFullYear()} InnerView</p>
+        <p className="relative text-xs text-fg-muted">© {new Date().getFullYear()} InnerViewHub</p>
       </aside>
 
       <main className="relative flex flex-1 flex-col items-center justify-center px-5 py-12 sm:px-10">

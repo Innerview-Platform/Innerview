@@ -15,20 +15,22 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { buttonClasses } from '@/components/common/Button'
-import { Logo, LogoMark } from '@/components/common/Logo'
-import { ThemeToggle } from '@/components/common/ThemeToggle'
+import { LogoMark } from '@/components/common/Logo'
 import { INTERVIEW_TYPE_DESCRIPTIONS, INTERVIEW_TYPE_LABELS, INTERVIEW_TYPES, type InterviewType } from '@/constants/enums'
 import { Reveal, useInView } from '@/features/landing/components/Reveal'
 import { RoomPreview } from '@/features/landing/components/RoomPreview'
+import { SiteFooter, SiteHeader } from '@/features/marketing/components/MarketingLayout'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { cn } from '@/lib/utils'
 import { paths } from '@/routes/paths'
+import { PUBLIC_PAGES } from '@/seo/site'
 
 const NAV = [
   { href: '#how', label: 'How it works' },
   { href: '#types', label: 'Interview types' },
   { href: '#room', label: 'The room' },
   { href: '#feedback', label: 'Feedback' },
+  { href: '#faq', label: 'FAQ' },
 ]
 
 function SectionHeading({ eyebrow, title, children }: { eyebrow: string; title: React.ReactNode; children?: React.ReactNode }) {
@@ -142,7 +144,7 @@ function InterviewTypes() {
                 key={pane}
                 className={cn(
                   'flex aspect-[4/5] flex-col items-center justify-center gap-2 rounded-xl border text-xs font-medium transition-all duration-300',
-                  on ? 'border-primary/40 bg-primary/10 text-fg' : 'border-dashed border-border text-fg-muted/60',
+                  on ? 'border-primary/40 bg-primary/10 text-fg' : 'border-dashed border-border text-fg-muted',
                 )}
               >
                 <Icon className={cn('h-5 w-5 transition-colors', on ? 'text-primary' : '')} aria-hidden />
@@ -244,10 +246,45 @@ function FeedbackPreview() {
   )
 }
 
+// ── FAQ ───────────────────────────────────────────────────────────────────────
+
+const FAQ: { q: string; a: React.ReactNode }[] = [
+  {
+    q: 'Who is InnerViewHub for?',
+    a: 'Software engineers preparing for coding, system design, technical or behavioral interviews, and the friend, colleague or mentor who interviews them.',
+  },
+  {
+    q: 'Do you match me with a partner?',
+    a: (
+      <>
+        No. You choose who interviews you and invite them by email or with the room link; anyone else has to ask to join. If
+        you’re new to it, start with the{' '}
+        <Link to={paths.mockInterviewWithAFriend} className="font-medium text-fg underline decoration-border underline-offset-4 hover:decoration-fg">
+          guide to running a mock interview with a friend
+        </Link>
+        .
+      </>
+    ),
+  },
+  { q: 'What does it cost?', a: 'Creating an account and running interviews is free.' },
+  {
+    q: 'Which languages can I run?',
+    a: 'Common interview languages including Python, Java, C, C++, C#, Go, Rust, JavaScript and TypeScript, in a shared terminal both of you can type input into.',
+  },
+  {
+    q: 'Is the interview recorded?',
+    a: 'The video isn’t recorded. The code, whiteboard, chat and the interviewer’s private notes are saved with the interview, and you can replay how the code came together.',
+  },
+  {
+    q: 'Can someone else watch?',
+    a: 'Yes. A third person can join as a read-only observer who follows along but can’t edit or run code, which suits a mentor watching two peers practice.',
+  },
+]
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
-  useDocumentTitle('Mock technical interviews with real people')
+  useDocumentTitle(PUBLIC_PAGES.home.title)
 
   return (
     <div className="min-h-dvh overflow-x-clip bg-bg">
@@ -255,11 +292,8 @@ export default function LandingPage() {
         Skip to content
       </a>
 
-      <header className="sticky top-0 z-30 border-b border-border-subtle bg-bg/85 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-          <Link to={paths.home} aria-label="InnerView home">
-            <Logo size={30} compactOnMobile />
-          </Link>
+      <SiteHeader
+        nav={
           <nav className="hidden items-center gap-1 md:flex" aria-label="Sections">
             {NAV.map((item) => (
               <a key={item.href} href={item.href} className="rounded-lg px-3 py-2 text-sm text-fg-secondary transition-colors hover:text-fg">
@@ -267,17 +301,8 @@ export default function LandingPage() {
               </a>
             ))}
           </nav>
-          <div className="flex items-center gap-1 sm:gap-2">
-            <ThemeToggle />
-            <Link to={paths.login} className={buttonClasses({ variant: 'ghost', className: 'hidden sm:inline-flex' })}>
-              Sign in
-            </Link>
-            <Link to={paths.signup} className={buttonClasses()}>
-              Get started
-            </Link>
-          </div>
-        </div>
-      </header>
+        }
+      />
 
       <main id="main">
         {/* Hero */}
@@ -292,11 +317,11 @@ export default function LandingPage() {
               <p className="inline-flex animate-rise items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs text-fg-secondary">
                 <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Live mock interviews, peer to peer
               </p>
-              <h1 className="mt-6 animate-rise font-display text-[44px] leading-[1.02] tracking-tight [animation-delay:80ms] sm:text-6xl lg:text-[68px]">
+              <h1 className="mt-6 animate-rise-solid font-display text-[44px] leading-[1.02] tracking-tight [animation-delay:80ms] sm:text-6xl lg:text-[68px]">
                 Rehearse the interview <em className="text-brand-gradient -mr-1 pr-1">with real people</em>, before the one that counts.
               </h1>
               <p className="mt-6 max-w-xl animate-rise text-lg leading-relaxed text-fg-secondary [animation-delay:160ms]">
-                InnerView puts you in a real interview room with another engineer — video, a shared editor and whiteboard — and ends with
+                InnerViewHub puts you in a real interview room with another engineer — video, a shared editor and whiteboard — and ends with
                 honest, structured feedback.
               </p>
               <div className="mt-8 flex animate-rise flex-wrap items-center gap-3 [animation-delay:240ms]">
@@ -346,6 +371,14 @@ export default function LandingPage() {
               Each type opens the room with the tools that round needs — and the feedback asks about what that round measures.
             </SectionHeading>
             <InterviewTypes />
+            <Reveal className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+              <Link to={paths.mockCodingInterview} className="font-medium text-fg underline decoration-border underline-offset-4 hover:decoration-fg">
+                How a mock coding interview works
+              </Link>
+              <Link to={paths.systemDesignMockInterview} className="font-medium text-fg underline decoration-border underline-offset-4 hover:decoration-fg">
+                Plan a system design mock interview
+              </Link>
+            </Reveal>
           </div>
         </section>
 
@@ -398,7 +431,29 @@ export default function LandingPage() {
                 After every session, you rate each other on the criteria for that interview type and leave a few honest words — and
                 the interviewer adds a hire signal. Reviews and your rating build up over time, so you can see what’s improving.
               </SectionHeading>
+              <Reveal delay={120}>
+                <p className="mt-6 text-sm">
+                  <Link to={paths.feedbackRubric} className="font-medium text-fg underline decoration-border underline-offset-4 hover:decoration-fg">
+                    See the full feedback rubric for each interview type
+                  </Link>
+                </p>
+              </Reveal>
             </div>
+          </div>
+        </section>
+
+        {/* FAQ */}
+        <section id="faq" className="scroll-mt-16 border-t border-border-subtle bg-surface/50 py-24">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <SectionHeading eyebrow="FAQ" title="Questions people ask first" />
+            <dl className="mt-12 grid gap-x-12 gap-y-10 md:grid-cols-2">
+              {FAQ.map((item) => (
+                <Reveal key={item.q}>
+                  <dt className="text-base font-semibold">{item.q}</dt>
+                  <dd className="mt-2 text-[15px] leading-relaxed text-fg-secondary">{item.a}</dd>
+                </Reveal>
+              ))}
+            </dl>
           </div>
         </section>
 
@@ -424,12 +479,7 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="border-t border-border-subtle">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 text-sm text-fg-muted sm:flex-row sm:px-6">
-          <Logo size={22} />
-          <p>© {new Date().getFullYear()} InnerView. Practice makes calm.</p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   )
 }

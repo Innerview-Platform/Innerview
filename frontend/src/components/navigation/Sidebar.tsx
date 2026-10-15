@@ -33,7 +33,7 @@ export function Sidebar({ variant = 'desktop' }: SidebarProps) {
   return (
     <div className="flex h-full flex-col">
       <div className={cn('flex h-16 items-center border-b border-border', collapsed ? 'justify-center px-2' : 'justify-between px-4')}>
-        <Link to={paths.home} onClick={closeMobile} className="flex items-center gap-2" aria-label="InnerView dashboard">
+        <Link to={paths.home} onClick={closeMobile} className="flex items-center gap-2" aria-label="InnerViewHub dashboard">
           <LogoMark size={28} />
           {!collapsed && <Wordmark />}
         </Link>

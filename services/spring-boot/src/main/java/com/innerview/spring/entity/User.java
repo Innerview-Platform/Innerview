@@ -42,10 +42,12 @@ public class User {
 	@Column(unique = true, length = 30)
 	private String username;
 
-	@NotBlank(message = "Password is required")
-	@Column(nullable = false, name = "password_hash")
+	/** Null for accounts created through Google sign-in (they have no password; see hasPassword checks). */
+	@Column(name = "password_hash")
 	private String passwordHash;
 
+	// @Builder.Default: without it User.builder() ignores the initializer and leaves the field null.
+	@Builder.Default
 	@Column(name = "auth_provider", nullable = true)
 	private String authProvider = "local";
 
@@ -85,6 +87,7 @@ public class User {
 	@Column(name = "deleted_at")
 	private LocalDateTime deletedAt;
 
+	@Builder.Default
 	@Column(name = "forgot_password_count", nullable = false)
 	private Integer forgotPasswordCount = 0;
 
